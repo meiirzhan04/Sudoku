@@ -33,10 +33,6 @@ type BackendLeaderboardRow = {
   isPro: boolean;
 };
 
-function backendUrl() {
-  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-}
-
 export function DailyClient() {
   const { t } = useLanguage();
   const [city, setCity] = useState("");
@@ -58,7 +54,7 @@ export function DailyClient() {
   }, []);
 
   useEffect(() => {
-    fetch(`${backendUrl()}/api/daily/today`)
+    fetch(`/api/daily/today`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data: BackendDailyChallenge | null) => setChallengeId(data?.id))
       .catch(() => undefined);
@@ -73,7 +69,7 @@ export function DailyClient() {
     if (city) params.set("city", city);
     const query = params.toString();
 
-    fetch(`${backendUrl()}/api/daily/${challengeId}/leaderboard${query ? `?${query}` : ""}`, {
+    fetch(`/api/daily/${challengeId}/leaderboard${query ? `?${query}` : ""}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then((res) => (res.ok ? res.json() : []))

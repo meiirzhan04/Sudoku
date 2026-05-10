@@ -55,7 +55,7 @@ const difficultyLabels: Record<Difficulty, string> = {
 };
 
 function backendUrl() {
-  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+  return "";
 }
 
 export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolean; dailyChallengeId?: string }) {

@@ -29,10 +29,6 @@ type SessionUser = {
   role: "USER" | "ADMIN" | "PRO";
 };
 
-function backendUrl() {
-  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-}
-
 export function AppShell({ children }: { children: ReactNode }) {
   const { locale, setLocale, t } = useLanguage();
   const pathname = usePathname();
@@ -47,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       return;
     }
 
-    fetch(`${backendUrl()}/api/auth/me`, {
+    fetch(`/api/auth/me`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Accept-Language": locale
@@ -81,6 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     window.localStorage.removeItem("sudokumind-refresh-token");
     window.localStorage.removeItem("sudokumind-remember");
     document.cookie = "sm_access_token=; path=/; max-age=0; SameSite=Lax";
+    window.dispatchEvent(new Event("sudokumind-auth-updated"));
     setUser(null);
     router.push("/");
   }

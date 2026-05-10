@@ -52,4 +52,9 @@ public class GameController {
     public GameSessionResponse resume() {
         return gameService.resume(CurrentUser.id());
     }
+
+    @GetMapping("/active")
+    public GameSessionResponse active() {
+        return gameService.resume(CurrentUser.id());
+    }
 }

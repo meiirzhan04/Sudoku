@@ -80,10 +80,6 @@ type BackendGameHistory = {
   accuracy: number | string;
 };
 
-function backendUrl() {
-  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-}
-
 export function ProfileClient() {
   const { t, locale, setLocale } = useLanguage();
   const { setTheme } = useTheme();
@@ -118,7 +114,7 @@ export function ProfileClient() {
       return;
     }
 
-    fetch(`${backendUrl()}/api/users/me`, {
+    fetch(`/api/users/me`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Accept-Language": locale
@@ -144,7 +140,7 @@ export function ProfileClient() {
           theme: "system"
         });
         setBackendStats(user.stats);
-        fetch(`${backendUrl()}/api/games/history`, {
+        fetch(`/api/games/history`, {
           headers: {
             Authorization: `Bearer ${token}`,
             "Accept-Language": locale
@@ -201,7 +197,7 @@ export function ProfileClient() {
       return;
     }
 
-    const response = await fetch(`${backendUrl()}/api/users/me`, {
+    const response = await fetch(`/api/users/me`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -241,7 +237,7 @@ export function ProfileClient() {
   async function deleteAccount() {
     const token = window.localStorage.getItem("sudokumind-access-token");
     if (token) {
-      await fetch(`${backendUrl()}/api/users/me`, {
+      await fetch(`/api/users/me`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,

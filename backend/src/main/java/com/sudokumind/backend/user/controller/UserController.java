@@ -1,6 +1,7 @@
 package com.sudokumind.backend.user.controller;
 
 import com.sudokumind.backend.common.util.CurrentUser;
+import com.sudokumind.backend.user.dto.DashboardResponse;
 import com.sudokumind.backend.user.dto.PublicUserResponse;
 import com.sudokumind.backend.user.dto.UpdateProfileRequest;
 import com.sudokumind.backend.user.dto.UserResponse;
@@ -23,6 +24,11 @@ public class UserController {
     @GetMapping("/me")
     public UserResponse me() {
         return userService.me(CurrentUser.id());
+    }
+
+    @GetMapping("/me/dashboard")
+    public DashboardResponse dashboard() {
+        return userService.dashboard(CurrentUser.id());
     }
 
     @PutMapping("/me")

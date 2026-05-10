@@ -23,6 +23,11 @@ public class DailyController {
         return dailyService.today();
     }
 
+    @GetMapping("/today/status")
+    public DailyStatusResponse todayStatus() {
+        return dailyService.todayStatus(CurrentUser.id());
+    }
+
     @PostMapping("/{id}/submit")
     public void submit(@PathVariable UUID id, @Valid @RequestBody DailySubmitRequest request) {
         dailyService.submit(CurrentUser.id(), id, request);

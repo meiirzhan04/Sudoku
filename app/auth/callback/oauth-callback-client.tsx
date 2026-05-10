@@ -22,8 +22,9 @@ export function OAuthCallbackClient() {
     window.localStorage.setItem("sudokumind-access-token", accessToken);
     window.localStorage.setItem("sudokumind-refresh-token", refreshToken);
     window.localStorage.setItem("sudokumind-remember", "30");
+    window.dispatchEvent(new Event("sudokumind-auth-updated"));
     document.cookie = `sm_access_token=${accessToken}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
-    router.replace("/play");
+    router.replace("/dashboard");
     router.refresh();
   }, [router, searchParams]);
 

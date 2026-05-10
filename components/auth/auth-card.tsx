@@ -56,12 +56,12 @@ export function AuthCard({ mode }: { mode: Mode }) {
         await register(form, email, password);
         await login(form, email, password);
         toast({ title: t("common.success"), variant: "success" });
-        router.push("/play");
+        router.push("/dashboard");
         router.refresh();
       } else {
         await login(form, email, password);
         toast({ title: t("auth.signIn"), variant: "success" });
-        router.push(searchParams.get("next") ?? "/play");
+        router.push(searchParams.get("next") ?? "/dashboard");
         router.refresh();
       }
     } catch (caught) {
@@ -78,7 +78,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
       throw new Error(t("auth.mismatch"));
     }
 
-    const response = await fetch(`${backendUrl()}/api/auth/register`, {
+    const response = await fetch(`/api/auth/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -102,7 +102,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
 
   async function login(form: FormData, email: string, password: string) {
     const rememberMe = Boolean(form.get("remember"));
-    const response = await fetch(`${backendUrl()}/api/auth/login`, {
+    const response = await fetch(`/api/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -119,6 +119,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
     window.localStorage.setItem("sudokumind-access-token", data.accessToken);
     window.localStorage.setItem("sudokumind-refresh-token", data.refreshToken);
     window.localStorage.setItem("sudokumind-remember", rememberMe ? "30" : "session");
+    window.dispatchEvent(new Event("sudokumind-auth-updated"));
     document.cookie = `sm_access_token=${data.accessToken}; path=/; max-age=${
       rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24
     }; SameSite=Lax`;

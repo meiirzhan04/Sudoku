@@ -83,6 +83,25 @@ public class DailyService {
                 .toList();
     }
 
+    @Transactional
+    public DailyStatusResponse todayStatus(UUID userId) {
+        DailyChallengeResponse today = today();
+        var result = resultRepository.findByUserIdAndDailyChallengeId(userId, today.id());
+        if (result.isEmpty()) {
+            return new DailyStatusResponse(today.id(), false, null, null, null, 0);
+        }
+        List<DailyResult> ranked = resultRepository.findByDailyChallengeIdOrderByTimeSecondsAscMistakesAscAccuracyDesc(today.id());
+        int rank = 1;
+        for (DailyResult item : ranked) {
+            if (item.getUser().getId().equals(userId)) {
+                break;
+            }
+            rank++;
+        }
+        DailyResult value = result.get();
+        return new DailyStatusResponse(today.id(), true, value.getTimeSeconds(), value.getMistakes(), value.getAccuracy().intValue(), rank);
+    }
+
     private DailyChallengeResponse toResponse(DailyChallenge challenge) {
         return new DailyChallengeResponse(challenge.getId(), challenge.getChallengeDate(), challenge.getPuzzle(), challenge.getDifficulty());
     }

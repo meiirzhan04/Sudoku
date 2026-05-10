@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   BarChart3,
@@ -24,12 +25,12 @@ import { Badge } from "@/components/ui/badge";
 import {
   HabitState,
   emptyHabitState,
-  loadHabitState,
   shareStreakText,
   todayKey,
   weeklyProgress,
   xpProgress
 } from "@/lib/streak";
+import { apiClient, hasAuthToken } from "@/lib/api-client";
 import { formatSeconds } from "@/lib/utils";
 
 type ContinueGame = {
@@ -41,44 +42,138 @@ type ContinueGame = {
   completed?: boolean;
 };
 
+type DashboardResponse = {
+  fullName: string;
+  username: string;
+  city?: string | null;
+  gamesPlayed: number;
+  completedGames: number;
+  bestTimeSeconds?: number | null;
+  averageAccuracy: number;
+  currentStreak: number;
+  longestStreak: number;
+  lastPlayedDate?: string | null;
+  completedDailyDates: string[];
+  xp: number;
+  level: number;
+  xpProgress: number;
+  xpNeeded: number;
+  xpLeft: number;
+  streakFreezes: number;
+  dailyGoalCompleted: boolean;
+  currentRank: string;
+};
+
+type ActiveGameResponse = {
+  difficulty: string;
+  elapsedSeconds: number;
+  mistakes: number;
+  currentBoard: number[][];
+  status: string;
+};
+
+type DailyStatusResponse = {
+  completed: boolean;
+  timeSeconds?: number;
+  mistakes?: number;
+  accuracy?: number;
+  rank: number;
+};
+
 export default function HomePage() {
-  const [habit, setHabit] = useState<HabitState>(() => emptyHabitState());
-  const [loading, setLoading] = useState(true);
-  const [continueGame, setContinueGame] = useState<ContinueGame | null>(null);
-  const [username, setUsername] = useState("Meirzhan");
+  const [isAuthed, setIsAuthed] = useState(false);
   const [milestone, setMilestone] = useState<number>();
-  const progress = xpProgress(habit);
-  const week = useMemo(() => weeklyProgress(habit), [habit]);
-  const completedToday = habit.completedDailyDates.includes(todayKey());
-  const recommendation = useMemo(() => smartRecommendation(habit), [habit]);
-  const dailyGoalDone = completedToday || habit.gamesCompleted > 0;
 
   useEffect(() => {
-    function refresh() {
-      const next = loadHabitState();
-      setHabit(next);
-      setUsername(window.localStorage.getItem("sudokumind-username") ?? "Meirzhan");
-      const rawGame = window.localStorage.getItem("sudokumind-current-game");
-      if (rawGame) {
-        try {
-          const parsed = JSON.parse(rawGame) as ContinueGame;
-          setContinueGame(parsed.completed ? null : parsed);
-        } catch {
-          setContinueGame(null);
+    setIsAuthed(hasAuthToken());
+    function refreshAuth() {
+      setIsAuthed(hasAuthToken());
+    }
+    window.addEventListener("storage", refreshAuth);
+    window.addEventListener("sudokumind-auth-updated", refreshAuth);
+    return () => {
+      window.removeEventListener("storage", refreshAuth);
+      window.removeEventListener("sudokumind-auth-updated", refreshAuth);
+    };
+  }, []);
+
+  const dashboardQuery = useQuery({
+    queryKey: ["dashboard"],
+    enabled: isAuthed,
+    queryFn: async () => (await apiClient.get<DashboardResponse>("/users/me/dashboard")).data
+  });
+
+  const activeGameQuery = useQuery({
+    queryKey: ["active-game"],
+    enabled: isAuthed,
+    queryFn: async () => {
+      try {
+        return (await apiClient.get<ActiveGameResponse>("/games/active")).data;
+      } catch (error: unknown) {
+        if (typeof error === "object" && error && "response" in error && (error as { response?: { status?: number } }).response?.status === 404) {
+          return null;
         }
+        throw error;
       }
+    }
+  });
+
+  const dailyStatusQuery = useQuery({
+    queryKey: ["daily-status"],
+    enabled: isAuthed,
+    queryFn: async () => (await apiClient.get<DailyStatusResponse>("/daily/today/status")).data
+  });
+
+  const dashboard = dashboardQuery.data;
+  const habit = useMemo<HabitState>(() => {
+    if (!dashboard) return emptyHabitState();
+    return {
+      ...emptyHabitState(),
+      currentStreak: dashboard.currentStreak,
+      longestStreak: dashboard.longestStreak,
+      lastPlayedDate: dashboard.lastPlayedDate ?? undefined,
+      completedDailyDates: dashboard.completedDailyDates,
+      xp: dashboard.xp,
+      level: dashboard.level,
+      streakFreezes: dashboard.streakFreezes,
+      gamesCompleted: dashboard.completedGames,
+      bestTimeSeconds: dashboard.bestTimeSeconds ?? undefined,
+      averageAccuracy: dashboard.averageAccuracy
+    };
+  }, [dashboard]);
+
+  const continueGame = useMemo<ContinueGame | null>(() => {
+    if (!activeGameQuery.data) return null;
+    return {
+      difficulty: activeGameQuery.data.difficulty.toLowerCase(),
+      elapsed_seconds: activeGameQuery.data.elapsedSeconds,
+      mistakes: activeGameQuery.data.mistakes,
+      entries: activeGameQuery.data.currentBoard,
+      completed: activeGameQuery.data.status === "COMPLETED"
+    };
+  }, [activeGameQuery.data]);
+
+  const progress = xpProgress(habit);
+  const week = useMemo(() => weeklyProgress(habit), [habit]);
+  const completedToday = dailyStatusQuery.data?.completed ?? dashboard?.dailyGoalCompleted ?? false;
+  const recommendation = useMemo(() => smartRecommendation(habit), [habit]);
+  const dailyGoalDone = completedToday;
+  const loading = isAuthed && (dashboardQuery.isLoading || activeGameQuery.isLoading || dailyStatusQuery.isLoading);
+  const username = dashboard?.fullName || dashboard?.username || "there";
+
+  useEffect(() => {
+    if (!isAuthed) return;
+    function refreshMilestone() {
       const lastMilestone = window.localStorage.getItem("sudokumind-last-streak-milestone");
       if (lastMilestone && !window.sessionStorage.getItem(`seen-streak-${lastMilestone}`)) {
         setMilestone(Number(lastMilestone));
         window.sessionStorage.setItem(`seen-streak-${lastMilestone}`, "1");
       }
-      setLoading(false);
     }
-
-    refresh();
-    window.addEventListener("sudokumind-habit-updated", refresh);
-    return () => window.removeEventListener("sudokumind-habit-updated", refresh);
-  }, []);
+    refreshMilestone();
+    window.addEventListener("sudokumind-habit-updated", refreshMilestone);
+    return () => window.removeEventListener("sudokumind-habit-updated", refreshMilestone);
+  }, [isAuthed]);
 
   function copyStreak() {
     navigator.clipboard?.writeText(shareStreakText(habit));
@@ -99,6 +194,10 @@ export default function HomePage() {
         </div>
       </div>
     );
+  }
+
+  if (!isAuthed) {
+    return <GuestDashboard />;
   }
 
   return (
@@ -139,12 +238,12 @@ export default function HomePage() {
           <DashboardMetric icon={Trophy} label="Best Time" value={habit.bestTimeSeconds ? formatSeconds(habit.bestTimeSeconds) : "--:--"} />
           <DashboardMetric icon={Shield} label="Accuracy" value={`${habit.averageAccuracy}%`} />
           <DashboardMetric icon={BarChart3} label="Completed Games" value={habit.gamesCompleted} />
-          <DashboardMetric icon={Medal} label="Current Rank" value={habit.currentStreak >= 7 ? "Gold II" : "Silver I"} />
+          <DashboardMetric icon={Medal} label="Current Rank" value={dashboard?.currentRank ?? "Starter"} />
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="grid gap-4 md:grid-cols-2">
-            <ContinueGameCard game={continueGame} />
+            {continueGame ? <ContinueGameCard game={continueGame} /> : null}
             <ActionCard
               icon={CalendarDays}
               title="Today's Challenge"
@@ -170,6 +269,72 @@ export default function HomePage() {
       {milestone ? <MilestoneModal milestone={milestone} onClose={() => setMilestone(undefined)} /> : null}
     </div>
   );
+}
+
+function GuestDashboard() {
+  return (
+    <div className="relative overflow-hidden">
+      <div className="premium-grid pointer-events-none absolute inset-x-0 top-0 h-[520px]" />
+      <div className="page-shell relative space-y-8">
+        <section className="grid min-h-[calc(100vh-12rem)] items-center gap-8 lg:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="space-y-6">
+            <Badge variant="outline" className="gap-2">
+              <Brain className="h-3.5 w-3.5 text-primary" />
+              SudokuMind
+            </Badge>
+            <div className="space-y-4">
+              <h1 className="text-balance text-5xl font-semibold tracking-tight sm:text-7xl">
+                Добро пожаловать в SudokuMind
+              </h1>
+              <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
+                Play as a guest right now, or create an account to unlock streaks, XP, saved games, profile stats and daily progress.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button size="lg" asChild>
+                <Link href="/login">
+                  <LogInIcon />
+                  Войти
+                </Link>
+              </Button>
+              <Button size="lg" variant="outline" asChild>
+                <Link href="/play">
+                  <ArrowRight className="h-4 w-4" />
+                  Играть как гость
+                </Link>
+              </Button>
+              <Button size="lg" variant="secondary" asChild>
+                <Link href="/register">Register</Link>
+              </Button>
+            </div>
+          </div>
+
+          <Card className="overflow-hidden bg-card/90 shadow-soft backdrop-blur">
+            <CardHeader>
+              <CardTitle>What unlocks after login?</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {[
+                "Personal dashboard with real backend stats",
+                "Daily streak and XP level",
+                "Cloud saved games",
+                "Profile, city leaderboard and achievements"
+              ].map((item) => (
+                <div key={item} className="flex items-center gap-3 rounded-lg border bg-background/60 p-3 text-sm">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  {item}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function LogInIcon() {
+  return <ArrowRight className="h-4 w-4" />;
 }
 
 function StreakCard({

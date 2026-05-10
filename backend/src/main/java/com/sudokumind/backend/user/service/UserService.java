@@ -2,8 +2,12 @@ package com.sudokumind.backend.user.service;
 
 import com.sudokumind.backend.common.exception.ApiException;
 import com.sudokumind.backend.common.exception.ErrorCode;
+import com.sudokumind.backend.common.enums.UserRole;
+import com.sudokumind.backend.daily.entity.DailyResult;
+import com.sudokumind.backend.daily.repository.DailyResultRepository;
 import com.sudokumind.backend.friends.repository.FriendRepository;
 import com.sudokumind.backend.game.repository.GameSessionRepository;
+import com.sudokumind.backend.user.dto.DashboardResponse;
 import com.sudokumind.backend.user.dto.PublicUserResponse;
 import com.sudokumind.backend.user.dto.UpdateProfileRequest;
 import com.sudokumind.backend.user.dto.UserResponse;
@@ -14,7 +18,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 @Service
@@ -23,12 +30,14 @@ public class UserService {
     private final UserMapper userMapper;
     private final GameSessionRepository gameSessionRepository;
     private final FriendRepository friendRepository;
+    private final DailyResultRepository dailyResultRepository;
 
-    public UserService(UserRepository userRepository, UserMapper userMapper, GameSessionRepository gameSessionRepository, FriendRepository friendRepository) {
+    public UserService(UserRepository userRepository, UserMapper userMapper, GameSessionRepository gameSessionRepository, FriendRepository friendRepository, DailyResultRepository dailyResultRepository) {
         this.userRepository = userRepository;
         this.userMapper = userMapper;
         this.gameSessionRepository = gameSessionRepository;
         this.friendRepository = friendRepository;
+        this.dailyResultRepository = dailyResultRepository;
     }
 
     public User require(UUID id) {
@@ -82,5 +91,75 @@ public class UserService {
         BigDecimal accuracy = gameSessionRepository.averageAccuracyByUserId(userId);
         long friends = friendRepository.countByUserId(userId);
         return new UserStatsDto(games, wins, best, accuracy == null ? BigDecimal.ZERO : accuracy, (int) Math.min(wins, 30), friends);
+    }
+
+    public DashboardResponse dashboard(UUID userId) {
+        User user = require(userId);
+        UserStatsDto stats = stats(userId);
+        List<DailyResult> dailyResults = dailyResultRepository.findByUserIdOrderByCompletedAtDesc(userId);
+        Set<LocalDate> completedDates = new TreeSet<>((a, b) -> b.compareTo(a));
+        for (DailyResult result : dailyResults) {
+            completedDates.add(result.getDailyChallenge().getChallengeDate());
+        }
+
+        int currentStreak = currentStreak(completedDates);
+        int longestStreak = longestStreak(completedDates);
+        int xp = (int) (stats.wins() * 50 + dailyResults.size() * 100L + currentStreak * 20L);
+        int level = Math.max(1, xp / 1000 + 1);
+        int levelStart = (level - 1) * 1000;
+        int xpProgress = xp - levelStart;
+        int xpNeeded = 1000;
+        int averageAccuracy = stats.averageAccuracy() == null ? 100 : stats.averageAccuracy().intValue();
+        String rank = stats.wins() >= 50 ? "Diamond" : stats.wins() >= 20 ? "Gold" : stats.wins() >= 5 ? "Silver" : "Starter";
+        List<String> dates = completedDates.stream().map(LocalDate::toString).toList();
+
+        return new DashboardResponse(
+                user.getFullName(),
+                user.getUsername(),
+                user.getCity(),
+                stats.gamesPlayed(),
+                stats.wins(),
+                stats.bestTimeSeconds(),
+                averageAccuracy == 0 ? 100 : averageAccuracy,
+                currentStreak,
+                Math.max(longestStreak, stats.bestStreak()),
+                dates.isEmpty() ? null : dates.get(0),
+                dates,
+                xp,
+                level,
+                xpProgress,
+                xpNeeded,
+                Math.max(0, xpNeeded - xpProgress),
+                user.getRole() == UserRole.PRO ? 2 : 0,
+                completedDates.contains(LocalDate.now()),
+                rank
+        );
+    }
+
+    private int currentStreak(Set<LocalDate> completedDates) {
+        if (completedDates.isEmpty()) return 0;
+        LocalDate cursor = completedDates.contains(LocalDate.now()) ? LocalDate.now() : LocalDate.now().minusDays(1);
+        int streak = 0;
+        while (completedDates.contains(cursor)) {
+            streak++;
+            cursor = cursor.minusDays(1);
+        }
+        return streak;
+    }
+
+    private int longestStreak(Set<LocalDate> completedDates) {
+        int longest = 0;
+        int current = 0;
+        LocalDate previous = null;
+        for (LocalDate date : completedDates.stream().sorted().toList()) {
+            if (previous != null && previous.plusDays(1).equals(date)) {
+                current++;
+            } else {
+                current = 1;
+            }
+            longest = Math.max(longest, current);
+            previous = date;
+        }
+        return longest;
     }
 }
