@@ -1,92 +1,220 @@
 # SudokuMind
 
-SudokuMind is a full-stack daily Sudoku and brain-training platform.
+SudokuMind is a modern web platform for playing, learning and competing in Sudoku. It combines classic Sudoku gameplay with daily challenges, AI coaching, leaderboards, personal statistics, Google authentication, premium customization ideas and a competitive friend battle mode.
 
-The repository now contains:
+> Train your brain. One grid at a time.
 
-- `app/`, `components/`, `lib/`: existing Next.js frontend.
-- `backend/`: Spring Boot 3 backend for auth, users, games, daily challenge, friends, multiplayer, AI coach, JWT, Google OAuth, WebSocket/STOMP, PostgreSQL and Flyway.
+## Product Idea
 
-## Backend Stack
+SudokuMind turns a simple Sudoku board into a startup-style brain training product. Players can solve generated puzzles, keep progress in their profile, compare daily challenge results, ask an AI Coach for strategy explanations and race friends in Sudoku Battle.
 
-- Java 17+
+The product is built for:
+
+- Casual Sudoku players who want a polished daily habit.
+- Students and learners who want explanations instead of raw answers.
+- Competitive players who care about time, accuracy and rankings.
+- Demo/recruiting contexts where the app should feel like a real product, not a small exercise.
+
+## Key Features
+
+- Premium landing page with SudokuMind branding, dark/light mode and responsive UI.
+- Email/password auth, Google OAuth, JWT sessions and user profiles.
+- Generated Sudoku puzzles with Easy, Medium, Hard, Expert and Insane difficulty.
+- Timer, mistakes, notes mode, undo/redo, hints, pause and autosave.
+- Daily Challenge with shared puzzle, city/global leaderboard and streak-oriented UX.
+- AI Coach architecture with local fallback and Anthropic/OpenAI-ready integration style.
+- Global and city leaderboard mock page for empty-production states.
+- Profile with saved user data, stats and backend game history.
+- Pro/Pricing page with Stripe-ready mock checkout positioning.
+- Sudoku Battle mock realtime mode with rooms, lobby, invite links, ready/start flow, live opponent progress, results, XP, friends and achievements.
+
+## Multiplayer Battle Mode
+
+SudokuMind includes a competitive friend battle mode where users can create private rooms, invite friends with a room code, and race to solve the same Sudoku puzzle. The winner is determined by completion time, mistakes and hints used.
+
+This feature adds social retention and makes the product more than a simple Sudoku board. It turns Sudoku into a competitive brain-training experience.
+
+Current implementation:
+
+- Frontend mock realtime room engine stored in `localStorage`.
+- Fake room code and invite link generation.
+- Lobby with host badge, player list, ready status, difficulty and battle mode.
+- Animated `3, 2, 1, Go` countdown.
+- Same Sudoku puzzle for all players.
+- Live progress bars, opponent status, timer, mistakes and hints.
+- Result screen with winner card, ranking table, XP, rematch and share actions.
+- Friends list, add friend by username, invite action, battle history, rank and achievements.
+- Refresh recovery through saved room state.
+
+Realtime-ready data model:
+
+```ts
+rooms: {
+  id: string
+  roomCode: string
+  hostId: string
+  difficulty: "easy" | "medium" | "hard" | "expert" | "insane"
+  mode: "1v1 Race" | "Group Race" | "No Mistakes Challenge" | "Fastest Time Wins"
+  status: "waiting" | "playing" | "finished"
+  puzzle: number[][]
+  solution: number[][]
+  createdAt: string
+  startedAt?: string
+  finishedAt?: string
+}
+
+roomPlayers: {
+  roomId: string
+  userId: string
+  username: string
+  avatarUrl?: string
+  city: string
+  isHost: boolean
+  isReady: boolean
+  progress: number
+  mistakes: number
+  hintsUsed: number
+  finishTime?: number
+  status: "online" | "playing" | "finished" | "disconnected"
+}
+
+moves: {
+  roomId: string
+  userId: string
+  cellIndex: number
+  value: number
+  isCorrect: boolean
+  createdAt: string
+}
+```
+
+Future realtime adapters can use Spring WebSocket/STOMP, Firebase Firestore `onSnapshot`, or Supabase Realtime channels.
+
+## Tech Stack
+
+Frontend:
+
+- Next.js 14 App Router
+- React 18
+- TypeScript
+- Tailwind CSS
+- Framer Motion
+- lucide-react
+- next-themes
+
+Backend:
+
 - Spring Boot 3
-- Spring Web, Security, Data JPA, Validation
+- Java 17
+- Spring Security
+- JWT access/refresh tokens
+- Google OAuth2
 - PostgreSQL
-- Flyway migrations
-- JWT access token + refresh token
-- Google OAuth2 Client
-- WebSocket + STOMP
-- OpenAPI / Swagger UI
-- BCrypt password hashing
+- Flyway
+- WebSocket/STOMP foundation
+- Render deployment
 
-## Run With Docker Compose
+Deployment:
 
-```bash
-docker compose up --build
-```
+- Frontend: Vercel
+- Backend: Render
+- Database: PostgreSQL
 
-Services:
+## Database Structure
 
-- Backend: `http://localhost:8080`
-- Swagger: `http://localhost:8080/swagger-ui.html`
-- WebSocket: `ws://localhost:8080/ws`
-- PostgreSQL: `localhost:5432`
+Core backend tables/entities:
 
-Default database:
+- `users`: id, username, email, avatarUrl, city, role, provider, createdAt.
+- `game_sessions`: userId, puzzle, solution, currentBoard, difficulty, elapsedSeconds, mistakes, hintsUsed, status.
+- `daily_challenges`: date, puzzle, solution, difficulty.
+- `daily_results`: userId, challengeId, timeSeconds, mistakes, accuracy, completedAt.
+- `friends`: friendship and friend request records.
+- `ai_hint_logs`: prompt/response logs for coach explanations.
 
-- DB: `sudokumind`
-- User: `sudokumind`
-- Password: `sudokumind`
+Planned battle persistence:
 
-## Run Backend Locally
+- `battle_rooms`
+- `battle_room_players`
+- `battle_moves`
+- `battle_results`
+- `battle_achievements`
 
-From `backend/`:
+## Environment Variables
 
-```bash
-./mvnw spring-boot:run
-```
-
-On Windows:
-
-```powershell
-.\mvnw.cmd spring-boot:run
-```
-
-The wrapper downloads Maven on first use if Maven is not installed globally.
-
-If Docker/PostgreSQL credentials are not available, use the development-only in-memory profile:
-
-```powershell
-.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=local
-```
-
-This uses H2 and keeps data only while the backend process is running.
-
-Windows shortcuts:
-
-```powershell
-.\run-local.cmd
-.\run-postgres.cmd
-```
-
-If you see `Process terminated with exit code: 1`, check the real error above it. The common causes are:
-
-- Port `8080` is already busy because backend is already running.
-- You ran PostgreSQL mode, but local PostgreSQL does not accept `sudokumind/sudokumind`.
-- Google OAuth env vars are missing in non-local mode.
-
-## Environment
-
-Backend variables are documented in [backend/.env.example](backend/.env.example).
-
-Frontend should use:
+Frontend `.env`:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8080
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+ANTHROPIC_API_KEY=
 ```
 
-## Main API Surface
+Backend variables:
+
+```env
+FRONTEND_URL=http://localhost:3000
+JWT_SECRET=replace-with-a-long-secret
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/sudokumind
+SPRING_DATASOURCE_USERNAME=sudokumind
+SPRING_DATASOURCE_PASSWORD=sudokumind
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+ANTHROPIC_API_KEY=
+```
+
+Production:
+
+- Vercel `NEXT_PUBLIC_API_URL` should point to Render backend.
+- Render `FRONTEND_URL` should point to the Vercel production domain.
+- Google OAuth redirect URI should be:
+
+```txt
+https://your-render-backend.onrender.com/login/oauth2/code/google
+```
+
+## How To Run Locally
+
+Install frontend dependencies:
+
+```bash
+npm install
+```
+
+Run frontend:
+
+```bash
+npm run dev
+```
+
+Run backend:
+
+```powershell
+cd backend
+.\mvnw.cmd spring-boot:run
+```
+
+Or with local helper:
+
+```powershell
+.\run-local.cmd
+```
+
+## Verification
+
+Frontend production build:
+
+```bash
+npm run build
+```
+
+Backend package:
+
+```powershell
+cd backend
+.\mvnw.cmd -q -DskipTests package
+```
+
+## API Surface
 
 Auth:
 
@@ -94,8 +222,6 @@ Auth:
 - `POST /api/auth/login`
 - `POST /api/auth/refresh`
 - `POST /api/auth/logout`
-- `POST /api/auth/forgot-password`
-- `POST /api/auth/reset-password`
 - `GET /api/auth/me`
 - `GET /oauth2/authorization/google`
 
@@ -105,98 +231,47 @@ Users:
 - `PUT /api/users/me`
 - `DELETE /api/users/me`
 - `GET /api/users/search?username=...`
-- `GET /api/users/{id}/public-profile`
 
 Games:
 
 - `POST /api/games`
-- `GET /api/games/{id}`
-- `PUT /api/games/{id}/move`
 - `PUT /api/games/{id}/save`
 - `POST /api/games/{id}/complete`
 - `GET /api/games/history`
-- `GET /api/games/resume`
 
 Daily:
 
 - `GET /api/daily/today`
 - `POST /api/daily/{id}/submit`
 - `GET /api/daily/{id}/leaderboard`
-- `GET /api/daily/{id}/leaderboard?city=Almaty`
-
-Friends:
-
-- `POST /api/friends/requests`
-- `GET /api/friends/requests/incoming`
-- `GET /api/friends/requests/outgoing`
-- `PUT /api/friends/requests/{id}/accept`
-- `PUT /api/friends/requests/{id}/decline`
-- `GET /api/friends`
-- `DELETE /api/friends/{friendId}`
-- `GET /api/friends/search?username=...`
-
-Multiplayer:
-
-- `POST /api/multiplayer/rooms`
-- `POST /api/multiplayer/rooms/join`
-- `GET /api/multiplayer/rooms/{roomId}`
-- `POST /api/multiplayer/rooms/{roomId}/start`
-- `POST /api/multiplayer/rooms/{roomId}/rematch`
-- `POST /api/multiplayer/rooms/{roomId}/leave`
-
-WebSocket STOMP:
-
-- Connect: `ws://localhost:8080/ws`
-- Subscribe: `/topic/rooms/{roomId}`, `/topic/rooms/{roomId}/moves`, `/topic/rooms/{roomId}/presence`
-- Send: `/app/rooms/{roomId}/move`, `/app/rooms/{roomId}/progress`, `/app/rooms/{roomId}/presence`
 
 AI:
 
 - `POST /api/ai/explain-cell`
+- Frontend fallback route: `POST /api/ai/hint`
 
-## Auth Notes
+## Business Potential
 
-- Access token expires after 15 minutes.
-- Refresh token expires after 7 days, or 30 days with `rememberMe=true`.
-- Store the access token on the frontend and send it as:
+SudokuMind is positioned as a retention-focused brain training platform:
 
-```http
-Authorization: Bearer <accessToken>
-```
+- Daily challenges create habit loops.
+- Friend battles create social retention.
+- AI Coach creates learning value.
+- Pro plan supports unlimited hints, premium themes, advanced stats and expert puzzles.
+- City leaderboards make the product feel local and competitive.
 
-Refresh with:
+## Future Improvements
 
-```http
-POST /api/auth/refresh
-```
+- Replace mock Battle adapter with Spring WebSocket or Firestore/Supabase Realtime.
+- Persist battle rooms, moves and results in PostgreSQL.
+- Add Stripe Checkout and subscription webhooks.
+- Add premium board skins and Kids Mode.
+- Add Morning Brain Mode with short focus sessions.
+- Add real global leaderboard endpoint.
+- Add avatar upload storage.
 
-## Localization
+## Links
 
-Backend accepts:
-
-```http
-Accept-Language: en
-Accept-Language: ru
-Accept-Language: kk
-```
-
-Localized message files:
-
-- `backend/src/main/resources/messages_en.properties`
-- `backend/src/main/resources/messages_ru.properties`
-- `backend/src/main/resources/messages_kk.properties`
-
-## Verification
-
-Backend compile/package:
-
-```powershell
-cd backend
-.\mvnw.cmd -q -DskipTests package
-```
-
-Frontend build:
-
-```bash
-npm run build
-```
+- Deployment: add your Vercel production URL here.
+- Backend: add your Render backend URL here.
+- GitHub: https://github.com/meiirzhan04/Sudoku

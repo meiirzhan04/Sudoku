@@ -6,8 +6,14 @@ import { AppProviders } from "@/components/providers/app-providers";
 import { AppShell } from "@/components/app-shell";
 
 export const metadata: Metadata = {
-  title: "SudokuMind",
-  description: "Daily Sudoku brain training with multilingual AI coaching."
+  title: {
+    default: "SudokuMind - Train your brain. One grid at a time.",
+    template: "%s | SudokuMind"
+  },
+  description: "A modern Sudoku platform with AI coaching, daily challenges, leaderboards and friend battles.",
+  icons: {
+    icon: "/favicon.svg"
+  }
 };
 
 export default function RootLayout({

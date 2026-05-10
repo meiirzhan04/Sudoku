@@ -45,6 +45,13 @@ type BackendGameSession = {
 };
 
 const digits = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+const difficultyLabels: Record<Difficulty, string> = {
+  easy: "Easy",
+  medium: "Medium",
+  hard: "Hard",
+  expert: "Expert",
+  insane: "Insane"
+};
 
 function backendUrl() {
   return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
@@ -382,7 +389,7 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
                 {daily ? t("daily.title") : t("nav.play")}
               </div>
               <div className="mt-1 text-2xl font-semibold tracking-tight">
-                {!daily ? t(`game.${difficulty}`) : t("game.medium")}
+                {!daily ? difficultyLabels[difficulty] : t("game.medium")}
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2 sm:min-w-[320px]">
@@ -403,6 +410,7 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
                   <SelectItem value="medium">{t("game.medium")}</SelectItem>
                   <SelectItem value="hard">{t("game.hard")}</SelectItem>
                   <SelectItem value="expert">{t("game.expert")}</SelectItem>
+                  <SelectItem value="insane">Insane</SelectItem>
                 </SelectContent>
               </Select>
             ) : null}

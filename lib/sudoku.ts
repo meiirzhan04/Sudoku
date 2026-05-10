@@ -1,4 +1,4 @@
-export type Difficulty = "easy" | "medium" | "hard" | "expert";
+export type Difficulty = "easy" | "medium" | "hard" | "expert" | "insane";
 export type Board = number[][];
 
 export type Puzzle = {
@@ -12,7 +12,8 @@ const removals: Record<Difficulty, number> = {
   easy: 38,
   medium: 46,
   hard: 52,
-  expert: 58
+  expert: 58,
+  insane: 62
 };
 
 export function emptyBoard(): Board {

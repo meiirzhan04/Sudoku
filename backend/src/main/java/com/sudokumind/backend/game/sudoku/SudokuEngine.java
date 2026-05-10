@@ -12,7 +12,8 @@ public class SudokuEngine {
             Difficulty.EASY, 38,
             Difficulty.MEDIUM, 46,
             Difficulty.HARD, 52,
-            Difficulty.EXPERT, 58
+            Difficulty.EXPERT, 58,
+            Difficulty.INSANE, 62
     );
 
     public SudokuPuzzle generate(Difficulty difficulty) {

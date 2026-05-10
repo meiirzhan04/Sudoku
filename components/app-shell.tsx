@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { Brain, Crown, Globe2, LogOut, Moon, SunMedium, UserRound } from "lucide-react";
+import { Crown, Globe2, LogOut, Moon, SunMedium, UserRound } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -69,7 +70,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const links = [
     { href: "/play", label: t("nav.play") },
     { href: "/daily", label: t("nav.daily") },
-    { href: "/profile", label: t("nav.profile") }
+    { href: "/battle", label: "Battle" },
+    { href: "/leaderboard", label: "Leaderboard" },
+    { href: "/profile", label: t("nav.profile") },
+    { href: "/pro", label: "Pricing" }
   ];
 
   function signOut() {
@@ -86,13 +90,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-40 border-b border-border/70 bg-background/78 backdrop-blur-xl">
         <div className="mx-auto flex min-h-16 w-full max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:flex-nowrap sm:gap-3 sm:px-6 lg:px-8">
           <Link href="/" className="group flex items-center gap-2 font-semibold">
-            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm shadow-primary/25 transition-transform group-hover:-translate-y-0.5">
-              <Brain className="h-5 w-5" />
-            </span>
+            <Image src="/favicon.svg" alt="SudokuMind" width={36} height={36} className="rounded-md shadow-sm shadow-primary/25 transition-transform group-hover:-translate-y-0.5" priority />
             <span className="hidden tracking-tight min-[380px]:inline">SudokuMind</span>
           </Link>
 
-          <nav className="ms-2 hidden items-center gap-1 rounded-md border bg-card/60 p-1 md:flex">
+          <nav className="ms-2 hidden items-center gap-1 rounded-md border bg-card/60 p-1 lg:flex">
             {links.map((link) => (
               <Button key={link.href} variant={pathname === link.href ? "secondary" : "ghost"} size="sm" asChild>
                 <Link href={link.href}>{link.label}</Link>
@@ -127,10 +129,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
             </Button>
 
-            <Button variant="outline" size="sm" asChild className="hidden sm:inline-flex">
+            <Button variant="outline" size="sm" asChild className="hidden sm:inline-flex lg:hidden xl:inline-flex">
               <Link href="/pro">
                 <Crown className="h-4 w-4 text-primary" />
-                {t("nav.pro")}
+                Pricing
               </Link>
             </Button>
 
@@ -165,6 +167,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
+      <nav className="sticky top-16 z-30 flex gap-1 overflow-x-auto border-b bg-background/88 px-3 py-2 backdrop-blur lg:hidden">
+        {links.map((link) => (
+          <Button key={link.href} variant={pathname === link.href ? "secondary" : "ghost"} size="sm" asChild>
+            <Link href={link.href}>{link.label}</Link>
+          </Button>
+        ))}
+      </nav>
       <main>{children}</main>
     </div>
   );

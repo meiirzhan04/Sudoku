@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Brain, CalendarDays, Clock3, ShieldCheck, Sparkles, Trophy, Zap } from "lucide-react";
+import { ArrowRight, Brain, CalendarDays, Clock3, ShieldCheck, Sparkles, Swords, Trophy, Users, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -40,6 +40,12 @@ export default function HomePage() {
             </Button>
             <Button size="lg" variant="outline" asChild>
               <Link href="/daily">{t("landing.ctaDaily")}</Link>
+            </Button>
+            <Button size="lg" variant="secondary" asChild>
+              <Link href="/battle">
+                <Swords className="h-4 w-4" />
+                Start Battle
+              </Link>
             </Button>
           </div>
           <div className="grid max-w-xl grid-cols-1 gap-3 pt-2 min-[420px]:grid-cols-3">
@@ -114,6 +120,52 @@ export default function HomePage() {
           </motion.div>
         ))}
       </section>
+
+      <section className="grid gap-6 pb-10 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="surface overflow-hidden rounded-xl p-6 sm:p-8">
+          <div className="flex h-11 w-11 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <Users className="h-5 w-5" />
+          </div>
+          <div className="mt-6 max-w-3xl space-y-3">
+            <h2 className="text-3xl font-semibold tracking-tight">Play Sudoku with Friends</h2>
+            <p className="text-muted-foreground">
+              Challenge your friends in real-time Sudoku races. Same puzzle, same timer, one winner.
+            </p>
+          </div>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Button asChild>
+              <Link href="/battle">
+                <Swords className="h-4 w-4" />
+                Start Battle
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/battle">Invite Friend</Link>
+            </Button>
+          </div>
+        </div>
+        <Card className="overflow-hidden">
+          <CardContent className="space-y-4 p-5">
+            <div className="text-sm font-medium">SudokuMind Pro</div>
+            <div className="text-3xl font-semibold">$4.99/mo</div>
+            <p className="text-sm text-muted-foreground">Unlimited hints, AI Coach, advanced stats and premium skins.</p>
+            <Button className="w-full" asChild>
+              <Link href="/pro">See Pricing</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+
+      <footer className="border-t py-8 text-sm text-muted-foreground">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row">
+          <span>SudokuMind - Train your brain. One grid at a time.</span>
+          <div className="flex gap-4">
+            <Link href="/play" className="hover:text-foreground">Play</Link>
+            <Link href="/battle" className="hover:text-foreground">Battle</Link>
+            <Link href="/pro" className="hover:text-foreground">Pricing</Link>
+          </div>
+        </div>
+      </footer>
       </div>
     </div>
   );
