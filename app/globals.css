@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 24% 98%;
+    --foreground: 226 28% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 18% 10%;
+    --primary: 166 82% 36%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 218 22% 94%;
+    --secondary-foreground: 224 18% 10%;
+    --muted: 218 22% 94%;
+    --muted-foreground: 220 10% 41%;
+    --accent: 205 38% 92%;
+    --accent-foreground: 224 18% 10%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 18% 86%;
+    --input: 220 18% 86%;
+    --ring: 167 84% 37%;
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    --background: 226 28% 7%;
+    --foreground: 220 24% 96%;
+    --card: 225 24% 10%;
+    --card-foreground: 220 20% 96%;
+    --primary: 168 82% 45%;
+    --primary-foreground: 225 18% 7%;
+    --secondary: 224 20% 15%;
+    --secondary-foreground: 220 20% 96%;
+    --muted: 224 20% 15%;
+    --muted-foreground: 220 10% 68%;
+    --accent: 210 28% 18%;
+    --accent-foreground: 220 20% 96%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 224 14% 20%;
+    --input: 224 14% 20%;
+    --ring: 168 82% 45%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+    min-height: 100vh;
+    background-image:
+      linear-gradient(to bottom, hsl(var(--background) / 0.92), hsl(var(--background))),
+      linear-gradient(120deg, hsl(166 82% 36% / 0.12), transparent 34%, hsl(248 65% 62% / 0.10) 70%, transparent);
+    font-feature-settings: "ss01", "cv05", "cv11";
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.22);
+  }
+}
+
+@layer components {
+  .page-shell {
+    @apply mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8;
+  }
+
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded-md bg-muted;
+  }
+
+  .surface {
+    @apply border bg-card/85 shadow-soft backdrop-blur;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .premium-grid {
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.45) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.45) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: linear-gradient(to bottom, black, transparent 85%);
+  }
+
+  .confetti-piece {
+    animation: confetti-fall 1200ms ease-out forwards;
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px) rotate(0deg) scale(0.6);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(120px) rotate(220deg) scale(1);
+  }
+}

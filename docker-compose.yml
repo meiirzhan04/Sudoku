@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sudokumind-postgres
+    environment:
+      POSTGRES_DB: sudokumind
+      POSTGRES_USER: sudokumind
+      POSTGRES_PASSWORD: sudokumind
+    ports:
+      - "5432:5432"
+    volumes:
+      - sudokumind-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sudokumind -d sudokumind"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    container_name: sudokumind-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sudokumind
+      SPRING_DATASOURCE_USERNAME: sudokumind
+      SPRING_DATASOURCE_PASSWORD: sudokumind
+      JWT_SECRET: ${JWT_SECRET:-replace-this-with-a-very-long-256-bit-secret-for-local-dev-only}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    ports:
+      - "8080:8080"
+
+volumes:
+  sudokumind-postgres:

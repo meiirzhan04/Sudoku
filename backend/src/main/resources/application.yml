@@ -1,0 +1,52 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: sudokumind-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/sudokumind}
+    username: ${SPRING_DATASOURCE_USERNAME:sudokumind}
+    password: ${SPRING_DATASOURCE_PASSWORD:sudokumind}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  messages:
+    basename: messages
+    encoding: UTF-8
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
+            scope:
+              - openid
+              - profile
+              - email
+
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  jwt:
+    secret: ${JWT_SECRET:replace-this-with-a-very-long-256-bit-secret-for-local-dev-only}
+    access-token-minutes: 15
+    refresh-token-days: 7
+    refresh-token-remember-days: 30
+  oauth2:
+    success-redirect-path: ${OAUTH_SUCCESS_REDIRECT_PATH:/auth/callback}
+  anthropic:
+    api-key: ${ANTHROPIC_API_KEY:}
+    model: ${ANTHROPIC_MODEL:claude-sonnet-4-20250514}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
