@@ -31,6 +31,7 @@ import {
 import { useLanguage } from "@/components/providers/language-provider";
 import { useToast } from "@/components/ui/toast";
 import { languageNames, Locale, locales } from "@/lib/i18n/messages";
+import { HabitState, emptyHabitState, loadHabitState } from "@/lib/streak";
 import { formatSeconds, initials } from "@/lib/utils";
 
 type ProfileState = {
@@ -97,7 +98,15 @@ export function ProfileClient() {
   });
   const [games, setGames] = useState<GameHistory[]>([]);
   const [backendStats, setBackendStats] = useState<BackendUser["stats"]>();
+  const [habit, setHabit] = useState<HabitState>(() => emptyHabitState());
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const refresh = () => setHabit(loadHabitState());
+    refresh();
+    window.addEventListener("sudokumind-habit-updated", refresh);
+    return () => window.removeEventListener("sudokumind-habit-updated", refresh);
+  }, []);
 
   useEffect(() => {
     const token = window.localStorage.getItem("sudokumind-access-token");
@@ -166,7 +175,7 @@ export function ProfileClient() {
         games: backendStats.gamesPlayed,
         avg: backendStats.bestTimeSeconds ?? 0,
         accuracy: Math.round(averageAccuracy || 100),
-        streak: backendStats.bestStreak
+        streak: Math.max(backendStats.bestStreak, habit.longestStreak)
       };
     }
 
@@ -177,8 +186,8 @@ export function ProfileClient() {
     const accuracy = completed.length
       ? Math.round(completed.reduce((sum, game) => sum + Number(game.accuracy ?? 100), 0) / completed.length)
       : 100;
-    return { games: games.length, avg, accuracy, streak: Math.min(games.length, 12) };
-  }, [backendStats, games]);
+    return { games: games.length, avg, accuracy, streak: Math.max(habit.longestStreak, Math.min(games.length, 12)) };
+  }, [backendStats, games, habit.longestStreak]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -285,6 +294,8 @@ export function ProfileClient() {
         <Stat label={t("profile.avg")} value={formatSeconds(stats.avg)} />
         <Stat label={t("profile.accuracy")} value={`${stats.accuracy}%`} />
         <Stat label={t("profile.streak")} value={stats.streak} />
+        <Stat label="Current streak" value={`${habit.currentStreak}d`} />
+        <Stat label="Level" value={habit.level} />
       </div>
 
       <Tabs defaultValue="settings">

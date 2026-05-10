@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BadgeCheck, MapPin } from "lucide-react";
+import { BadgeCheck, Clipboard, MapPin } from "lucide-react";
 import { SudokuGame } from "@/app/play/sudoku-game";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/components/providers/language-provider";
+import { HabitState, emptyHabitState, loadHabitState, shareStreakText } from "@/lib/streak";
 import { formatSeconds } from "@/lib/utils";
 
 type LeaderboardRow = {
@@ -41,10 +43,18 @@ export function DailyClient() {
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
   const [challengeId, setChallengeId] = useState<string>();
   const [now, setNow] = useState(() => new Date());
+  const [habit, setHabit] = useState<HabitState>(() => emptyHabitState());
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => setHabit(loadHabitState());
+    refresh();
+    window.addEventListener("sudokumind-habit-updated", refresh);
+    return () => window.removeEventListener("sudokumind-habit-updated", refresh);
   }, []);
 
   useEffect(() => {
@@ -87,6 +97,10 @@ export function DailyClient() {
     next.setHours(24, 0, 0, 0);
     return formatSeconds(Math.max(0, Math.floor((next.getTime() - now.getTime()) / 1000)));
   }, [now]);
+
+  function copyStreak() {
+    navigator.clipboard?.writeText(shareStreakText(habit));
+  }
 
   return (
     <div className="page-shell space-y-6">
@@ -133,6 +147,10 @@ export function DailyClient() {
                 </div>
               ))}
             </div>
+            <Button variant="outline" className="w-full" onClick={copyStreak}>
+              <Clipboard className="h-4 w-4" />
+              Share Streak
+            </Button>
           </CardContent>
         </Card>
       </div>

@@ -90,6 +90,25 @@ moves: {
 
 Future realtime adapters can use Spring WebSocket/STOMP, Firebase Firestore `onSnapshot`, or Supabase Realtime channels.
 
+## Habit & Streak System
+
+SudokuMind includes a habit-building streak system that encourages users to return every day. Players can complete daily challenges, build streaks, earn XP, unlock achievements and track weekly progress.
+
+This turns Sudoku from a one-time puzzle into a daily brain-training habit.
+
+The dashboard shows:
+
+- Current Streak with a weekly completion line.
+- Daily Challenge status and Share Streak action.
+- XP, level progress and rewards.
+- Continue Game card from local autosave.
+- Daily Goal with XP reward.
+- Weekly Progress chart.
+- Streak milestones: 3, 7, 14, 30 and 100 days.
+- Pro-oriented Streak Freeze UI.
+
+Guest users store habit data in `localStorage`. The storage service in `lib/streak.ts` is intentionally isolated so it can later be backed by PostgreSQL, Firestore or Supabase without rewriting the dashboard UI.
+
 ## Tech Stack
 
 Frontend:

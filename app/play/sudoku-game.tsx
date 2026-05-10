@@ -26,6 +26,7 @@ import {
   makeShareCard,
   relatedCell
 } from "@/lib/sudoku";
+import { completeDailyChallenge, recordCompletedGame } from "@/lib/streak";
 import { formatSeconds } from "@/lib/utils";
 
 type HistoryItem = {
@@ -223,9 +224,23 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
     const key = daily ? `daily-${dailySeed()}` : serverGame?.id ?? seed;
     if (winToastKey === key) return;
     setWinToastKey(key);
+    if (daily) {
+      completeDailyChallenge({
+        timeSeconds: elapsed,
+        mistakes,
+        accuracy: accuracy(entries, mistakes)
+      });
+    } else {
+      recordCompletedGame({
+        elapsedSeconds: elapsed,
+        mistakes,
+        accuracy: accuracy(entries, mistakes),
+        difficulty
+      });
+    }
     autosave();
     toast({ title: t("game.win"), variant: "success" });
-  }, [autosave, daily, seed, serverGame?.id, solved, t, toast, winToastKey]);
+  }, [autosave, daily, difficulty, elapsed, entries, mistakes, seed, serverGame?.id, solved, t, toast, winToastKey]);
 
   const snapshot = useCallback(() => {
     setHistory((items) => [...items, { entries: cloneBoard(entries), notes: { ...notes }, mistakes }].slice(-60));
