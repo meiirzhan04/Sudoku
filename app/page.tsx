@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from "@/components/providers/language-provider";
 import {
   HabitState,
   emptyHabitState,
@@ -31,6 +32,7 @@ import {
   xpProgress
 } from "@/lib/streak";
 import { apiClient, hasAuthToken } from "@/lib/api-client";
+import type { Locale } from "@/lib/i18n/messages";
 import { formatSeconds } from "@/lib/utils";
 
 type ContinueGame = {
@@ -80,7 +82,319 @@ type DailyStatusResponse = {
   rank: number;
 };
 
+const dashboardCopy: Record<Locale, {
+  tagline: string;
+  welcomeBack: string;
+  guestTitle: string;
+  guestText: string;
+  login: string;
+  guestPlay: string;
+  register: string;
+  unlockTitle: string;
+  unlocks: string[];
+  daily: string;
+  quick: string;
+  bestTime: string;
+  accuracy: string;
+  completedGames: string;
+  currentRank: string;
+  starter: string;
+  streakTitle: string;
+  startToday: string;
+  dayStreak: (days: number) => string;
+  firstStreak: string;
+  streakSafe: string;
+  extendStreak: string;
+  playDaily: string;
+  dailyDone: string;
+  continueStreak: string;
+  today: string;
+  longestStreak: string;
+  streakFreeze: string;
+  days: string;
+  available: string;
+  shareStreak: string;
+  level: (level: number) => string;
+  xpLeft: string;
+  dailyChallenge: string;
+  battleWin: string;
+  noMistakes: string;
+  streakBonus: string;
+  continueGame: string;
+  difficulty: string;
+  time: string;
+  mistakes: string;
+  continue: string;
+  noGame: string;
+  startNewGame: string;
+  todaysChallenge: string;
+  completedDaily: string;
+  dailyText: string;
+  viewLeaderboard: string;
+  quickTitle: string;
+  quickText: string;
+  battleTitle: string;
+  battleText: string;
+  startBattle: string;
+  aiTitle: string;
+  aiText: string;
+  explainCell: string;
+  themesTitle: string;
+  themesText: string;
+  explorePro: string;
+  dailyGoal: string;
+  goals: string[];
+  done: string;
+  completedBadge: string;
+  daysToPush: (days: number) => string;
+  weekly: string;
+  achievements: string;
+  cityTop: string;
+  keepTraining: string;
+  milestoneText: string;
+  recommendations: {
+    streak: string;
+    accuracy: string;
+    hard: string;
+    start: string;
+  };
+}> = {
+  en: {
+    tagline: "Train your brain. One grid at a time.",
+    welcomeBack: "Welcome back",
+    guestTitle: "Welcome to SudokuMind",
+    guestText: "Play as a guest right now, or create an account to unlock streaks, XP, saved games, profile stats and daily progress.",
+    login: "Log in",
+    guestPlay: "Play as guest",
+    register: "Register",
+    unlockTitle: "What unlocks after login?",
+    unlocks: ["Personal dashboard with real backend stats", "Daily streak and XP level", "Cloud saved games", "Profile, city leaderboard and achievements"],
+    daily: "Daily Challenge",
+    quick: "Quick Play",
+    bestTime: "Best Time",
+    accuracy: "Accuracy",
+    completedGames: "Completed Games",
+    currentRank: "Current Rank",
+    starter: "Starter",
+    streakTitle: "Current Streak",
+    startToday: "Start today",
+    dayStreak: (days) => `${days} Day Streak`,
+    firstStreak: "Start your first streak today.",
+    streakSafe: "Keep your brain sharp today. Your streak is protected.",
+    extendStreak: "One puzzle away from extending your streak.",
+    playDaily: "Play Daily Challenge",
+    dailyDone: "Daily Done",
+    continueStreak: "Continue Streak",
+    today: "Today",
+    longestStreak: "Longest streak",
+    streakFreeze: "Streak Freeze",
+    days: "days",
+    available: "available",
+    shareStreak: "Share Streak",
+    level: (level) => `Level ${level} Brain Trainer`,
+    xpLeft: "XP left",
+    dailyChallenge: "Daily Challenge",
+    battleWin: "Battle Win",
+    noMistakes: "No Mistakes",
+    streakBonus: "Streak Bonus",
+    continueGame: "Continue Game",
+    difficulty: "Difficulty",
+    time: "Time",
+    mistakes: "Mistakes",
+    continue: "Continue",
+    noGame: "No unfinished game found. Start fresh and build momentum.",
+    startNewGame: "Start New Game",
+    todaysChallenge: "Today's Challenge",
+    completedDaily: "Completed. Your streak is safe today.",
+    dailyText: "Complete today's puzzle to continue your streak.",
+    viewLeaderboard: "View Leaderboard",
+    quickTitle: "Quick Play",
+    quickText: "Generate a fresh puzzle and keep your XP moving.",
+    battleTitle: "Battle with Friends",
+    battleText: "Race on the same puzzle, same timer, one winner.",
+    startBattle: "Start Battle",
+    aiTitle: "AI Coach",
+    aiText: "Ask for strategy hints without spoiling the whole board.",
+    explainCell: "Explain a Cell",
+    themesTitle: "Themes",
+    themesText: "Classic, Neon, Minimal, Dark Glass, Ocean and Cyberpunk skins.",
+    explorePro: "Explore Pro",
+    dailyGoal: "Daily Goal",
+    goals: ["Complete 1 puzzle today", "Use no more than 2 hints", "Finish one Medium puzzle", "Win one Battle"],
+    done: "Done",
+    completedBadge: "Completed badge unlocked. XP reward claimed and streak protected.",
+    daysToPush: (days) => `${days} days from your next big streak push.`,
+    weekly: "Weekly Progress",
+    achievements: "Recent Achievements",
+    cityTop: "Top players from your city",
+    keepTraining: "Keep training",
+    milestoneText: "Your brain officially refuses to be average.",
+    recommendations: {
+      streak: "You are close to a 10-day streak. Complete today's challenge.",
+      accuracy: "Your accuracy dipped recently. Try Focus Mode and use fewer guesses.",
+      hard: "You usually solve Medium puzzles fastest. Try Hard today.",
+      start: "Complete today's puzzle to start building a daily brain-training habit."
+    }
+  },
+  ru: {
+    tagline: "Тренируй мозг. Одна сетка за раз.",
+    welcomeBack: "С возвращением",
+    guestTitle: "Добро пожаловать в SudokuMind",
+    guestText: "Играй как гость прямо сейчас или создай аккаунт, чтобы открыть стрики, XP, сохранённые игры, профиль и ежедневный прогресс.",
+    login: "Войти",
+    guestPlay: "Играть как гость",
+    register: "Регистрация",
+    unlockTitle: "Что откроется после входа?",
+    unlocks: ["Личный dashboard с реальной статистикой backend", "Ежедневный стрик и XP уровень", "Сохранение игр в облаке", "Профиль, рейтинг города и достижения"],
+    daily: "Ежедневное",
+    quick: "Быстрая игра",
+    bestTime: "Лучшее время",
+    accuracy: "Точность",
+    completedGames: "Завершено игр",
+    currentRank: "Текущий ранг",
+    starter: "Новичок",
+    streakTitle: "Текущий стрик",
+    startToday: "Начни сегодня",
+    dayStreak: (days) => `${days} дней стрика`,
+    firstStreak: "Начни свой первый стрик сегодня.",
+    streakSafe: "Мозг в форме. Стрик на сегодня защищён.",
+    extendStreak: "Одна головоломка до продления стрика.",
+    playDaily: "Играть Daily Challenge",
+    dailyDone: "Daily выполнен",
+    continueStreak: "Продлить стрик",
+    today: "Сегодня",
+    longestStreak: "Лучший стрик",
+    streakFreeze: "Защита стрика",
+    days: "дней",
+    available: "доступно",
+    shareStreak: "Поделиться стриком",
+    level: (level) => `Уровень ${level} Brain Trainer`,
+    xpLeft: "XP осталось",
+    dailyChallenge: "Daily Challenge",
+    battleWin: "Победа в битве",
+    noMistakes: "Без ошибок",
+    streakBonus: "Бонус стрика",
+    continueGame: "Продолжить игру",
+    difficulty: "Сложность",
+    time: "Время",
+    mistakes: "Ошибки",
+    continue: "Продолжить",
+    noGame: "Незавершённых игр нет. Начни новую и набери темп.",
+    startNewGame: "Новая игра",
+    todaysChallenge: "Сегодняшний Challenge",
+    completedDaily: "Выполнено. Стрик сегодня в безопасности.",
+    dailyText: "Пройди сегодняшнюю головоломку, чтобы продлить стрик.",
+    viewLeaderboard: "Открыть рейтинг",
+    quickTitle: "Быстрая игра",
+    quickText: "Сгенерируй новую головоломку и продолжай собирать XP.",
+    battleTitle: "Битва с друзьями",
+    battleText: "Одна головоломка, один таймер, один победитель.",
+    startBattle: "Начать битву",
+    aiTitle: "AI Coach",
+    aiText: "Попроси стратегическую подсказку без полного спойлера.",
+    explainCell: "Объяснить клетку",
+    themesTitle: "Темы",
+    themesText: "Classic, Neon, Minimal, Dark Glass, Ocean и Cyberpunk скины.",
+    explorePro: "Смотреть Pro",
+    dailyGoal: "Цель дня",
+    goals: ["Пройти 1 головоломку сегодня", "Использовать не больше 2 подсказок", "Завершить одну Medium головоломку", "Выиграть одну Battle"],
+    done: "Готово",
+    completedBadge: "Бейдж получен. XP начислен, стрик защищён.",
+    daysToPush: (days) => `${days} дней до следующего большого рывка стрика.`,
+    weekly: "Прогресс недели",
+    achievements: "Последние достижения",
+    cityTop: "Лучшие игроки твоего города",
+    keepTraining: "Продолжить тренировку",
+    milestoneText: "Твой мозг официально отказывается быть средним.",
+    recommendations: {
+      streak: "Ты близко к 10-дневному стрику. Пройди сегодняшний challenge.",
+      accuracy: "Точность просела. Попробуй Focus Mode и меньше угадывай.",
+      hard: "Medium даётся тебе быстро. Попробуй Hard сегодня.",
+      start: "Пройди сегодняшнюю головоломку и начни ежедневную тренировку мозга."
+    }
+  },
+  kk: {
+    tagline: "Миды жаттықтыр. Бір тордан баста.",
+    welcomeBack: "Қайта келгеніңе қуаныштымыз",
+    guestTitle: "SudokuMind-қа қош келдіңіз",
+    guestText: "Қазір қонақ ретінде ойна немесе стрик, XP, сақталған ойындар, профиль және күнделікті прогресс үшін аккаунт аш.",
+    login: "Кіру",
+    guestPlay: "Қонақ ретінде ойнау",
+    register: "Тіркелу",
+    unlockTitle: "Кіргеннен кейін не ашылады?",
+    unlocks: ["Backend-тен нақты статистикасы бар жеке dashboard", "Күнделікті стрик және XP деңгейі", "Ойындарды бұлтта сақтау", "Профиль, қала рейтингі және жетістіктер"],
+    daily: "Күнделікті",
+    quick: "Жылдам ойын",
+    bestTime: "Үздік уақыт",
+    accuracy: "Дәлдік",
+    completedGames: "Аяқталған ойындар",
+    currentRank: "Қазіргі ранг",
+    starter: "Бастаушы",
+    streakTitle: "Қазіргі стрик",
+    startToday: "Бүгін баста",
+    dayStreak: (days) => `${days} күндік стрик`,
+    firstStreak: "Алғашқы стрикті бүгін баста.",
+    streakSafe: "Миың сергек. Бүгінгі стрик қорғалды.",
+    extendStreak: "Стрикті ұзартуға бір puzzle қалды.",
+    playDaily: "Daily Challenge ойнау",
+    dailyDone: "Daily аяқталды",
+    continueStreak: "Стрикті ұзарту",
+    today: "Бүгін",
+    longestStreak: "Ең ұзақ стрик",
+    streakFreeze: "Стрик қорғанысы",
+    days: "күн",
+    available: "қолжетімді",
+    shareStreak: "Стрикпен бөлісу",
+    level: (level) => `${level}-деңгей Brain Trainer`,
+    xpLeft: "XP қалды",
+    dailyChallenge: "Daily Challenge",
+    battleWin: "Battle жеңісі",
+    noMistakes: "Қатесіз",
+    streakBonus: "Стрик бонусы",
+    continueGame: "Ойынды жалғастыру",
+    difficulty: "Қиындық",
+    time: "Уақыт",
+    mistakes: "Қате",
+    continue: "Жалғастыру",
+    noGame: "Аяқталмаған ойын жоқ. Жаңасын бастап, қарқын ал.",
+    startNewGame: "Жаңа ойын",
+    todaysChallenge: "Бүгінгі Challenge",
+    completedDaily: "Аяқталды. Бүгін стрик қауіпсіз.",
+    dailyText: "Стрикті жалғастыру үшін бүгінгі puzzle-ды аяқта.",
+    viewLeaderboard: "Рейтингті ашу",
+    quickTitle: "Жылдам ойын",
+    quickText: "Жаңа puzzle жасап, XP жинауды жалғастыр.",
+    battleTitle: "Достармен жарыс",
+    battleText: "Бір puzzle, бір таймер, бір жеңімпаз.",
+    startBattle: "Battle бастау",
+    aiTitle: "AI Coach",
+    aiText: "Толық жауапты ашпай, стратегия hint сұра.",
+    explainCell: "Ұяшықты түсіндіру",
+    themesTitle: "Тақырыптар",
+    themesText: "Classic, Neon, Minimal, Dark Glass, Ocean және Cyberpunk скиндері.",
+    explorePro: "Pro көру",
+    dailyGoal: "Күн мақсаты",
+    goals: ["Бүгін 1 puzzle аяқтау", "2 hint-тен артық қолданбау", "Бір Medium puzzle аяқтау", "Бір Battle жеңу"],
+    done: "Дайын",
+    completedBadge: "Бейдж ашылды. XP берілді, стрик қорғалды.",
+    daysToPush: (days) => `Келесі үлкен стрикке ${days} күн қалды.`,
+    weekly: "Апталық прогресс",
+    achievements: "Соңғы жетістіктер",
+    cityTop: "Қалаңдағы үздік ойыншылар",
+    keepTraining: "Жаттығуды жалғастыру",
+    milestoneText: "Миың енді орташа болудан ресми түрде бас тартты.",
+    recommendations: {
+      streak: "10 күндік стрикке жақынсың. Бүгінгі challenge-ды аяқта.",
+      accuracy: "Дәлдік төмендеді. Focus Mode қолданып, аз болжап көр.",
+      hard: "Medium саған тез беріледі. Бүгін Hard байқап көр.",
+      start: "Бүгінгі puzzle-ды аяқтап, күнделікті ми жаттығуын баста."
+    }
+  }
+};
+
 export default function HomePage() {
+  const { locale } = useLanguage();
+  const c = dashboardCopy[locale];
   const [isAuthed, setIsAuthed] = useState(false);
   const [milestone, setMilestone] = useState<number>();
 
@@ -156,7 +470,7 @@ export default function HomePage() {
   const progress = xpProgress(habit);
   const week = useMemo(() => weeklyProgress(habit), [habit]);
   const completedToday = dailyStatusQuery.data?.completed ?? dashboard?.dailyGoalCompleted ?? false;
-  const recommendation = useMemo(() => smartRecommendation(habit), [habit]);
+  const recommendation = useMemo(() => smartRecommendation(habit, c), [habit, c]);
   const dailyGoalDone = completedToday;
   const loading = isAuthed && (dashboardQuery.isLoading || activeGameQuery.isLoading || dailyStatusQuery.isLoading);
   const username = dashboard?.fullName || dashboard?.username || "there";
@@ -197,7 +511,7 @@ export default function HomePage() {
   }
 
   if (!isAuthed) {
-    return <GuestDashboard />;
+    return <GuestDashboard c={c} />;
   }
 
   return (
@@ -208,70 +522,70 @@ export default function HomePage() {
           <div>
             <Badge variant="outline" className="mb-3 gap-2">
               <Brain className="h-3.5 w-3.5 text-primary" />
-              Train your brain. One grid at a time.
+              {c.tagline}
             </Badge>
-            <h1 className="text-balance text-4xl font-semibold tracking-tight sm:text-5xl">Welcome back, {username}</h1>
+            <h1 className="text-balance text-4xl font-semibold tracking-tight sm:text-5xl">{c.welcomeBack}, {username}</h1>
             <p className="mt-3 max-w-2xl text-muted-foreground">{recommendation}</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button asChild>
               <Link href="/daily">
                 <CalendarDays className="h-4 w-4" />
-                Daily Challenge
+                {c.daily}
               </Link>
             </Button>
             <Button variant="outline" asChild>
               <Link href="/play">
                 <ArrowRight className="h-4 w-4" />
-                Quick Play
+                {c.quick}
               </Link>
             </Button>
           </div>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_420px]">
-          <StreakCard habit={habit} week={week} completedToday={completedToday} copyStreak={copyStreak} />
-          <LevelCard habit={habit} progress={progress} />
+          <StreakCard habit={habit} week={week} completedToday={completedToday} copyStreak={copyStreak} c={c} />
+          <LevelCard habit={habit} progress={progress} c={c} />
         </section>
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <DashboardMetric icon={Trophy} label="Best Time" value={habit.bestTimeSeconds ? formatSeconds(habit.bestTimeSeconds) : "--:--"} />
-          <DashboardMetric icon={Shield} label="Accuracy" value={`${habit.averageAccuracy}%`} />
-          <DashboardMetric icon={BarChart3} label="Completed Games" value={habit.gamesCompleted} />
-          <DashboardMetric icon={Medal} label="Current Rank" value={dashboard?.currentRank ?? "Starter"} />
+          <DashboardMetric icon={Trophy} label={c.bestTime} value={habit.bestTimeSeconds ? formatSeconds(habit.bestTimeSeconds) : "--:--"} />
+          <DashboardMetric icon={Shield} label={c.accuracy} value={`${habit.averageAccuracy}%`} />
+          <DashboardMetric icon={BarChart3} label={c.completedGames} value={habit.gamesCompleted} />
+          <DashboardMetric icon={Medal} label={c.currentRank} value={dashboard?.currentRank ?? c.starter} />
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="grid gap-4 md:grid-cols-2">
-            {continueGame ? <ContinueGameCard game={continueGame} /> : null}
+            {continueGame ? <ContinueGameCard game={continueGame} c={c} /> : null}
             <ActionCard
               icon={CalendarDays}
-              title="Today's Challenge"
-              text={completedToday ? "Completed. Your streak is safe today." : "Complete today’s puzzle to continue your streak."}
+              title={c.todaysChallenge}
+              text={completedToday ? c.completedDaily : c.dailyText}
               href="/daily"
-              cta={completedToday ? "View Leaderboard" : "Start Daily Challenge"}
+              cta={completedToday ? c.viewLeaderboard : c.playDaily}
               glow={!completedToday}
             />
-            <ActionCard icon={Zap} title="Quick Play" text="Generate a fresh puzzle and keep your XP moving." href="/play" cta="Start New Game" />
-            <ActionCard icon={Swords} title="Battle with Friends" text="Race on the same puzzle, same timer, one winner." href="/battle" cta="Start Battle" />
-            <ActionCard icon={Wand2} title="AI Coach" text="Ask for strategy hints without spoiling the whole board." href="/play" cta="Explain a Cell" />
-            <ActionCard icon={Sparkles} title="Themes" text="Classic, Neon, Minimal, Dark Glass, Ocean and Cyberpunk skins." href="/pro" cta="Explore Pro" />
+            <ActionCard icon={Zap} title={c.quickTitle} text={c.quickText} href="/play" cta={c.startNewGame} />
+            <ActionCard icon={Swords} title={c.battleTitle} text={c.battleText} href="/battle" cta={c.startBattle} />
+            <ActionCard icon={Wand2} title={c.aiTitle} text={c.aiText} href="/play" cta={c.explainCell} />
+            <ActionCard icon={Sparkles} title={c.themesTitle} text={c.themesText} href="/pro" cta={c.explorePro} />
           </div>
-          <DailyGoalCard done={dailyGoalDone} habit={habit} />
+          <DailyGoalCard done={dailyGoalDone} habit={habit} c={c} />
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <WeeklyChart week={week} />
-          <RecentPanel habit={habit} />
+          <WeeklyChart week={week} c={c} />
+          <RecentPanel habit={habit} c={c} />
         </section>
       </div>
 
-      {milestone ? <MilestoneModal milestone={milestone} onClose={() => setMilestone(undefined)} /> : null}
+      {milestone ? <MilestoneModal milestone={milestone} onClose={() => setMilestone(undefined)} c={c} /> : null}
     </div>
   );
 }
 
-function GuestDashboard() {
+function GuestDashboard({ c }: { c: typeof dashboardCopy.en }) {
   return (
     <div className="relative overflow-hidden">
       <div className="premium-grid pointer-events-none absolute inset-x-0 top-0 h-[520px]" />
@@ -283,43 +597,34 @@ function GuestDashboard() {
               SudokuMind
             </Badge>
             <div className="space-y-4">
-              <h1 className="text-balance text-5xl font-semibold tracking-tight sm:text-7xl">
-                Добро пожаловать в SudokuMind
-              </h1>
-              <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
-                Play as a guest right now, or create an account to unlock streaks, XP, saved games, profile stats and daily progress.
-              </p>
+              <h1 className="text-balance text-5xl font-semibold tracking-tight sm:text-7xl">{c.guestTitle}</h1>
+              <p className="max-w-2xl text-lg leading-8 text-muted-foreground">{c.guestText}</p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button size="lg" asChild>
                 <Link href="/login">
                   <LogInIcon />
-                  Войти
+                  {c.login}
                 </Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
                 <Link href="/play">
                   <ArrowRight className="h-4 w-4" />
-                  Играть как гость
+                  {c.guestPlay}
                 </Link>
               </Button>
               <Button size="lg" variant="secondary" asChild>
-                <Link href="/register">Register</Link>
+                <Link href="/register">{c.register}</Link>
               </Button>
             </div>
           </div>
 
           <Card className="overflow-hidden bg-card/90 shadow-soft backdrop-blur">
             <CardHeader>
-              <CardTitle>What unlocks after login?</CardTitle>
+              <CardTitle>{c.unlockTitle}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {[
-                "Personal dashboard with real backend stats",
-                "Daily streak and XP level",
-                "Cloud saved games",
-                "Profile, city leaderboard and achievements"
-              ].map((item) => (
+              {c.unlocks.map((item) => (
                 <div key={item} className="flex items-center gap-3 rounded-lg border bg-background/60 p-3 text-sm">
                   <Sparkles className="h-4 w-4 text-primary" />
                   {item}
@@ -341,12 +646,14 @@ function StreakCard({
   habit,
   week,
   completedToday,
-  copyStreak
+  copyStreak,
+  c
 }: {
   habit: HabitState;
   week: ReturnType<typeof weeklyProgress>;
   completedToday: boolean;
   copyStreak: () => void;
+  c: typeof dashboardCopy.en;
 }) {
   const empty = habit.currentStreak === 0;
   return (
@@ -363,21 +670,21 @@ function StreakCard({
               🔥
             </motion.div>
             <div>
-              <div className="text-sm font-medium text-muted-foreground">Current Streak</div>
+              <div className="text-sm font-medium text-muted-foreground">{c.streakTitle}</div>
               <div className="mt-1 text-4xl font-semibold tracking-tight">
-                {empty ? "Start today" : `${habit.currentStreak} Day Streak`}
+                {empty ? c.startToday : c.dayStreak(habit.currentStreak)}
               </div>
               <p className="mt-2 max-w-xl text-sm text-muted-foreground">
                 {empty
-                  ? "Start your first streak today."
+                  ? c.firstStreak
                   : completedToday
-                    ? "Keep your brain sharp today. Your streak is protected."
-                    : "One puzzle away from extending your streak."}
+                    ? c.streakSafe
+                    : c.extendStreak}
               </p>
             </div>
           </div>
           <Button asChild variant={completedToday ? "outline" : "default"}>
-            <Link href="/daily">{empty ? "Play Daily Challenge" : completedToday ? "Daily Done" : "Continue Streak"}</Link>
+            <Link href="/daily">{empty ? c.playDaily : completedToday ? c.dailyDone : c.continueStreak}</Link>
           </Button>
         </div>
 
@@ -392,7 +699,7 @@ function StreakCard({
                   day.today ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""
                 ].join(" ")}
               >
-                {day.completed ? "✓" : day.today ? "Today" : ""}
+                {day.completed ? "✓" : day.today ? c.today : ""}
               </div>
             </div>
           ))}
@@ -407,29 +714,29 @@ function StreakCard({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <MiniStat label="Longest streak" value={`${habit.longestStreak} days`} />
-          <MiniStat label="Streak Freeze" value={`${habit.streakFreezes} available`} />
-          <Button variant="outline" onClick={copyStreak}>Share Streak</Button>
+          <MiniStat label={c.longestStreak} value={`${habit.longestStreak} ${c.days}`} />
+          <MiniStat label={c.streakFreeze} value={`${habit.streakFreezes} ${c.available}`} />
+          <Button variant="outline" onClick={copyStreak}>{c.shareStreak}</Button>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function LevelCard({ habit, progress }: { habit: HabitState; progress: ReturnType<typeof xpProgress> }) {
+function LevelCard({ habit, progress, c }: { habit: HabitState; progress: ReturnType<typeof xpProgress>; c: typeof dashboardCopy.en }) {
   return (
     <Card className="overflow-hidden bg-card/90 shadow-soft backdrop-blur">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Zap className="h-5 w-5 text-primary" />
-          Level {habit.level} Brain Trainer
+          {c.level(habit.level)}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
         <div>
           <div className="mb-2 flex justify-between text-sm">
             <span>{progress.progress} / {progress.needed} XP</span>
-            <span className="text-muted-foreground">{progress.left} XP left</span>
+            <span className="text-muted-foreground">{progress.left} {c.xpLeft}</span>
           </div>
           <div className="h-3 overflow-hidden rounded-full bg-muted">
             <motion.div
@@ -441,43 +748,43 @@ function LevelCard({ habit, progress }: { habit: HabitState; progress: ReturnTyp
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <MiniStat label="Daily Challenge" value="+100 XP" />
-          <MiniStat label="Battle Win" value="+150 XP" />
-          <MiniStat label="No Mistakes" value="+75 XP" />
-          <MiniStat label="Streak Bonus" value="+20/day" />
+          <MiniStat label={c.dailyChallenge} value="+100 XP" />
+          <MiniStat label={c.battleWin} value="+150 XP" />
+          <MiniStat label={c.noMistakes} value="+75 XP" />
+          <MiniStat label={c.streakBonus} value="+20/day" />
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function ContinueGameCard({ game }: { game: ContinueGame | null }) {
+function ContinueGameCard({ game, c }: { game: ContinueGame | null; c: typeof dashboardCopy.en }) {
   const progress = game?.entries ? Math.round((game.entries.flat().filter(Boolean).length / 81) * 100) : 0;
   return (
     <Card className="bg-card/90 shadow-soft backdrop-blur">
       <CardHeader>
-        <CardTitle>Continue Game</CardTitle>
+        <CardTitle>{c.continueGame}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {game ? (
           <>
             <div className="grid grid-cols-3 gap-2">
-              <MiniStat label="Difficulty" value={game.difficulty ?? "Medium"} />
-              <MiniStat label="Time" value={formatSeconds(game.elapsed_seconds ?? 0)} />
-              <MiniStat label="Mistakes" value={game.mistakes ?? 0} />
+              <MiniStat label={c.difficulty} value={game.difficulty ?? "Medium"} />
+              <MiniStat label={c.time} value={formatSeconds(game.elapsed_seconds ?? 0)} />
+              <MiniStat label={c.mistakes} value={game.mistakes ?? 0} />
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-muted">
               <div className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
             </div>
             <Button className="w-full" asChild>
-              <Link href="/play">Continue</Link>
+              <Link href="/play">{c.continue}</Link>
             </Button>
           </>
         ) : (
           <>
-            <p className="text-sm text-muted-foreground">No unfinished game found. Start fresh and build momentum.</p>
+            <p className="text-sm text-muted-foreground">{c.noGame}</p>
             <Button className="w-full" asChild>
-              <Link href="/play">Start New Game</Link>
+              <Link href="/play">{c.startNewGame}</Link>
             </Button>
           </>
         )}
@@ -521,41 +828,36 @@ function ActionCard({
   );
 }
 
-function DailyGoalCard({ done, habit }: { done: boolean; habit: HabitState }) {
+function DailyGoalCard({ done, habit, c }: { done: boolean; habit: HabitState; c: typeof dashboardCopy.en }) {
   return (
     <Card className="bg-card/90 shadow-soft backdrop-blur">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Target className="h-5 w-5 text-primary" />
-          Daily Goal
+          {c.dailyGoal}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {[
-          "Complete 1 puzzle today",
-          "Use no more than 2 hints",
-          "Finish one Medium puzzle",
-          "Win one Battle"
-        ].map((goal, index) => (
+        {c.goals.map((goal, index) => (
           <div key={goal} className="flex items-center justify-between rounded-lg border bg-background/60 p-3">
             <span className="text-sm">{goal}</span>
-            <Badge variant={done && index === 0 ? "default" : "outline"}>{done && index === 0 ? "Done" : `+${index === 3 ? 150 : 50} XP`}</Badge>
+            <Badge variant={done && index === 0 ? "default" : "outline"}>{done && index === 0 ? c.done : `+${index === 3 ? 150 : 50} XP`}</Badge>
           </div>
         ))}
         <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 text-sm text-muted-foreground">
-          {done ? "Completed badge unlocked. XP reward claimed and streak protected." : `${Math.max(1, 10 - habit.currentStreak)} days from your next big streak push.`}
+          {done ? c.completedBadge : c.daysToPush(Math.max(1, 10 - habit.currentStreak))}
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function WeeklyChart({ week }: { week: ReturnType<typeof weeklyProgress> }) {
+function WeeklyChart({ week, c }: { week: ReturnType<typeof weeklyProgress>; c: typeof dashboardCopy.en }) {
   const max = Math.max(1, ...week.map((day) => day.puzzles));
   return (
     <Card className="bg-card/90 shadow-soft backdrop-blur">
       <CardHeader>
-        <CardTitle>Weekly Progress</CardTitle>
+        <CardTitle>{c.weekly}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex h-48 items-end gap-3">
@@ -579,12 +881,12 @@ function WeeklyChart({ week }: { week: ReturnType<typeof weeklyProgress> }) {
   );
 }
 
-function RecentPanel({ habit }: { habit: HabitState }) {
+function RecentPanel({ habit, c }: { habit: HabitState; c: typeof dashboardCopy.en }) {
   const topPlayers = ["Aruzhan", "Nfactorial", "Meirzhan"];
   return (
     <Card className="bg-card/90 shadow-soft backdrop-blur">
       <CardHeader>
-        <CardTitle>Recent Achievements</CardTitle>
+        <CardTitle>{c.achievements}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-2">
@@ -595,7 +897,7 @@ function RecentPanel({ habit }: { habit: HabitState }) {
           ))}
         </div>
         <div className="space-y-2">
-          <div className="text-sm font-medium">Top players from your city</div>
+          <div className="text-sm font-medium">{c.cityTop}</div>
           {topPlayers.map((player, index) => (
             <div key={player} className="flex items-center justify-between rounded-lg border bg-background/60 p-3 text-sm">
               <span>#{index + 1} {player}</span>
@@ -633,7 +935,7 @@ function MiniStat({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function MilestoneModal({ milestone, onClose }: { milestone: number; onClose: () => void }) {
+function MilestoneModal({ milestone, onClose, c }: { milestone: number; onClose: () => void; c: typeof dashboardCopy.en }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 p-4 backdrop-blur">
       <motion.div initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-md">
@@ -642,9 +944,9 @@ function MilestoneModal({ milestone, onClose }: { milestone: number; onClose: ()
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-4xl">🔥</div>
             <div>
               <h2 className="text-2xl font-semibold">{milestone} Day Streak!</h2>
-              <p className="mt-2 text-muted-foreground">Your brain officially refuses to be average.</p>
+              <p className="mt-2 text-muted-foreground">{c.milestoneText}</p>
             </div>
-            <Button className="w-full" onClick={onClose}>Keep training</Button>
+            <Button className="w-full" onClick={onClose}>{c.keepTraining}</Button>
           </CardContent>
         </Card>
       </motion.div>
@@ -652,15 +954,15 @@ function MilestoneModal({ milestone, onClose }: { milestone: number; onClose: ()
   );
 }
 
-function smartRecommendation(habit: HabitState) {
+function smartRecommendation(habit: HabitState, c: typeof dashboardCopy.en) {
   if (habit.currentStreak >= 7 && !habit.completedDailyDates.includes(todayKey())) {
-    return "You are close to a 10-day streak. Complete today’s challenge.";
+    return c.recommendations.streak;
   }
   if (habit.averageAccuracy < 90) {
-    return "Your accuracy dipped recently. Try Focus Mode and use fewer guesses.";
+    return c.recommendations.accuracy;
   }
   if (habit.gamesCompleted > 3) {
-    return "You usually solve Medium puzzles fastest. Try Hard today.";
+    return c.recommendations.hard;
   }
-  return "Complete today’s puzzle to start building a daily brain-training habit.";
+  return c.recommendations.start;
 }

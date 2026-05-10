@@ -6,6 +6,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useLanguage } from "@/components/providers/language-provider";
+import type { Locale } from "@/lib/i18n/messages";
 import { formatSeconds, initials } from "@/lib/utils";
 
 type LeaderboardEntry = {
@@ -28,7 +30,71 @@ const entries: LeaderboardEntry[] = [
   { username: "GridMaster", city: "Shymkent", bestTime: 430, accuracy: 94, completedGames: 44, rank: "Silver" }
 ];
 
+const copy: Record<Locale, {
+  badge: string;
+  title: string;
+  subtitle: string;
+  filter: string;
+  global: string;
+  rank: string;
+  player: string;
+  city: string;
+  bestTime: string;
+  accuracy: string;
+  completed: string;
+  tier: string;
+  cityTop: (city: string) => string;
+}> = {
+  en: {
+    badge: "Live rankings",
+    title: "Leaderboard",
+    subtitle: "Global and city rankings by best time, accuracy and completed games.",
+    filter: "Filter by city",
+    global: "Global leaderboard",
+    rank: "Rank",
+    player: "Player",
+    city: "City",
+    bestTime: "Best time",
+    accuracy: "Accuracy",
+    completed: "Completed",
+    tier: "Tier",
+    cityTop: (city) => `Top players from ${city}`
+  },
+  ru: {
+    badge: "Живой рейтинг",
+    title: "Рейтинг",
+    subtitle: "Глобальный и городской рейтинг по лучшему времени, точности и завершённым играм.",
+    filter: "Фильтр по городу",
+    global: "Глобальный рейтинг",
+    rank: "Место",
+    player: "Игрок",
+    city: "Город",
+    bestTime: "Лучшее время",
+    accuracy: "Точность",
+    completed: "Завершено",
+    tier: "Лига",
+    cityTop: (city) => `Лучшие игроки из ${city}`
+  },
+  kk: {
+    badge: "Тірі рейтинг",
+    title: "Рейтинг",
+    subtitle: "Үздік уақыт, дәлдік және аяқталған ойындар бойынша global және қала рейтингі.",
+    filter: "Қала бойынша сүзу",
+    global: "Global рейтинг",
+    rank: "Орын",
+    player: "Ойыншы",
+    city: "Қала",
+    bestTime: "Үздік уақыт",
+    accuracy: "Дәлдік",
+    completed: "Аяқталды",
+    tier: "Лига",
+    cityTop: (city) => `${city} қаласының үздік ойыншылары`
+  }
+};
+
 export default function LeaderboardPage() {
+  const { locale } = useLanguage();
+  const c = copy[locale];
   const [city, setCity] = useState("");
   const filtered = useMemo(
     () => entries.filter((entry) => entry.city.toLowerCase().includes(city.trim().toLowerCase())),
@@ -44,35 +110,35 @@ export default function LeaderboardPage() {
           <div>
             <Badge variant="outline" className="mb-3 gap-2">
               <Trophy className="h-3.5 w-3.5 text-primary" />
-              Live rankings
+              {c.badge}
             </Badge>
-            <h1 className="text-4xl font-semibold tracking-tight">Leaderboard</h1>
+            <h1 className="text-4xl font-semibold tracking-tight">{c.title}</h1>
             <p className="mt-2 max-w-2xl text-muted-foreground">
-              Global and city rankings by best time, accuracy and completed games.
+              {c.subtitle}
             </p>
           </div>
           <div className="relative w-full md:w-[320px]">
             <MapPin className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input className="ps-9" placeholder="Filter by city" value={city} onChange={(event) => setCity(event.target.value)} />
+            <Input className="ps-9" placeholder={c.filter} value={city} onChange={(event) => setCity(event.target.value)} />
           </div>
         </section>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <Card className="bg-card/88 shadow-soft backdrop-blur">
             <CardHeader>
-              <CardTitle>Global leaderboard</CardTitle>
+              <CardTitle>{c.global}</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-sm">
                 <thead className="text-muted-foreground">
                   <tr className="border-b">
-                    <th className="py-2 text-start">Rank</th>
-                    <th className="py-2 text-start">Player</th>
-                    <th className="py-2 text-start">City</th>
-                    <th className="py-2 text-start">Best time</th>
-                    <th className="py-2 text-start">Accuracy</th>
-                    <th className="py-2 text-start">Completed</th>
-                    <th className="py-2 text-start">Tier</th>
+                    <th className="py-2 text-start">{c.rank}</th>
+                    <th className="py-2 text-start">{c.player}</th>
+                    <th className="py-2 text-start">{c.city}</th>
+                    <th className="py-2 text-start">{c.bestTime}</th>
+                    <th className="py-2 text-start">{c.accuracy}</th>
+                    <th className="py-2 text-start">{c.completed}</th>
+                    <th className="py-2 text-start">{c.tier}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -105,7 +171,7 @@ export default function LeaderboardPage() {
 
           <Card className="bg-card/88 shadow-soft backdrop-blur">
             <CardHeader>
-              <CardTitle>Top players from {topCity}</CardTitle>
+              <CardTitle>{c.cityTop(topCity)}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {entries

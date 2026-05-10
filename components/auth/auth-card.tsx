@@ -11,12 +11,46 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/components/providers/language-provider";
 import { useToast } from "@/components/ui/toast";
+import type { Locale } from "@/lib/i18n/messages";
 
 type Mode = "login" | "register";
 
 type LoginResponse = {
   accessToken: string;
   refreshToken: string;
+};
+
+const authCopy: Record<Locale, { creating: string; entering: string; hidePassword: string; showPassword: string; weak: string; medium: string; strong: string; failed: string }> = {
+  en: {
+    creating: "Creating account...",
+    entering: "Signing in...",
+    hidePassword: "Hide password",
+    showPassword: "Show password",
+    weak: "Weak password",
+    medium: "Medium password",
+    strong: "Strong password",
+    failed: "Request failed. Check that backend is running."
+  },
+  ru: {
+    creating: "Создаём аккаунт...",
+    entering: "Входим...",
+    hidePassword: "Скрыть пароль",
+    showPassword: "Показать пароль",
+    weak: "Слабый пароль",
+    medium: "Средний пароль",
+    strong: "Сильный пароль",
+    failed: "Запрос не прошёл. Проверь, что backend работает."
+  },
+  kk: {
+    creating: "Аккаунт жасалып жатыр...",
+    entering: "Кіріп жатырмыз...",
+    hidePassword: "Құпиясөзді жасыру",
+    showPassword: "Құпиясөзді көрсету",
+    weak: "Әлсіз құпиясөз",
+    medium: "Орташа құпиясөз",
+    strong: "Күшті құпиясөз",
+    failed: "Сұрау орындалмады. Backend жұмыс істеп тұрғанын тексер."
+  }
 };
 
 function validPassword(password: string) {
@@ -29,6 +63,7 @@ function backendUrl() {
 
 export function AuthCard({ mode }: { mode: Mode }) {
   const { t, locale } = useLanguage();
+  const c = authCopy[locale];
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -48,7 +83,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "free" | "taken">("idle");
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email);
-  const passwordScore = useMemo(() => passwordStrength(values.password), [values.password]);
+  const passwordScore = useMemo(() => passwordStrength(values.password, c), [values.password, c]);
   const passwordsMatch = values.confirmPassword.length > 0 && values.password === values.confirmPassword;
   const formValid = isRegister
     ? values.fullName.trim().length > 1 &&
@@ -108,7 +143,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
         router.refresh();
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Request failed. Check that backend is running.");
+      setError(caught instanceof Error ? caught.message : c.failed);
     } finally {
       setPending(false);
     }
@@ -244,7 +279,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
                   type="button"
                   className="absolute end-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
                   onClick={() => setShowPassword((value) => !value)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? c.hidePassword : c.showPassword}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -296,7 +331,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
 
             <Button type="submit" className="w-full" disabled={pending || !formValid}>
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : success ? <CheckCircle2 className="h-4 w-4" /> : null}
-              {pending ? (isRegister ? "Создаём аккаунт..." : "Входим...") : isRegister ? t("auth.signUp") : t("auth.signIn")}
+              {pending ? (isRegister ? c.creating : c.entering) : isRegister ? t("auth.signUp") : t("auth.signIn")}
             </Button>
 
             <Button type="button" variant="outline" className="w-full" onClick={google}>
@@ -367,12 +402,12 @@ function Field({
   );
 }
 
-function passwordStrength(password: string) {
+function passwordStrength(password: string, c: typeof authCopy.en) {
   let score = 0;
   if (password.length >= 8) score += 1;
-  if (/[A-ZА-Я]/.test(password)) score += 1;
+  if (/[A-ZА-ЯӘҒҚҢӨҰҮҺІ]/.test(password)) score += 1;
   if (/\d/.test(password)) score += 1;
-  if (/[^A-Za-zА-Яа-я0-9]/.test(password)) score += 1;
-  const label = score <= 1 ? "Слабый пароль" : score === 2 ? "Средний пароль" : "Сильный пароль";
+  if (/[^A-Za-zА-Яа-яӘәҒғҚқҢңӨөҰұҮүҺһІі0-9]/.test(password)) score += 1;
+  const label = score <= 1 ? c.weak : score === 2 ? c.medium : c.strong;
   return { score: Math.max(1, score), label };
 }

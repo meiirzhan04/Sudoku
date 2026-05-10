@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/components/providers/language-provider";
-import { languageNames, Locale, locales } from "@/lib/i18n/messages";
+import { Locale, locales } from "@/lib/i18n/messages";
 import { initials } from "@/lib/utils";
 
 type SessionUser = {
@@ -30,8 +30,42 @@ type SessionUser = {
   role: "USER" | "ADMIN" | "PRO";
 };
 
+const languageNames: Record<Locale, string> = {
+  en: "🇬🇧 English",
+  ru: "🇷🇺 Русский",
+  kk: "🇰🇿 Қазақша"
+};
+
+const navCopy: Record<Locale, { battle: string; leaderboard: string; pricing: string; settings: string; profile: string; proBadge: string }> = {
+  en: {
+    battle: "Battle",
+    leaderboard: "Leaderboard",
+    pricing: "Pricing",
+    settings: "Settings",
+    profile: "Profile",
+    proBadge: "Pro"
+  },
+  ru: {
+    battle: "Битва",
+    leaderboard: "Рейтинг",
+    pricing: "Тарифы",
+    settings: "Настройки",
+    profile: "Профиль",
+    proBadge: "Pro"
+  },
+  kk: {
+    battle: "Жарыс",
+    leaderboard: "Рейтинг",
+    pricing: "Тарифтер",
+    settings: "Баптаулар",
+    profile: "Профиль",
+    proBadge: "Pro"
+  }
+};
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { locale, setLocale, t } = useLanguage();
+  const nav = navCopy[locale];
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -67,10 +101,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const links = [
     { href: "/play", label: t("nav.play") },
     { href: "/daily", label: t("nav.daily") },
-    { href: "/battle", label: "Battle" },
-    { href: "/leaderboard", label: "Leaderboard" },
-    ...(user ? [{ href: "/profile", label: t("nav.profile") }] : []),
-    { href: "/pro", label: "Pricing" }
+    { href: "/battle", label: nav.battle },
+    { href: "/leaderboard", label: nav.leaderboard },
+    ...(user ? [{ href: "/profile", label: nav.profile }, { href: "/settings", label: nav.settings }] : []),
+    { href: "/pro", label: nav.pricing }
   ];
 
   function signOut() {
@@ -130,7 +164,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Button variant="outline" size="sm" asChild className="hidden sm:inline-flex lg:hidden xl:inline-flex">
               <Link href="/pro">
                 <Crown className="h-4 w-4 text-primary" />
-                Pricing
+                {nav.pricing}
               </Link>
             </Button>
 
@@ -142,7 +176,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <AvatarFallback>{initials(user.fullName ?? user.email)}</AvatarFallback>
                   </Avatar>
                   {user.role === "PRO" ? (
-                    <Badge className="absolute -bottom-2 -end-2 px-1 py-0 text-[10px]">Pro</Badge>
+                    <Badge className="absolute -bottom-2 -end-2 px-1 py-0 text-[10px]">{nav.proBadge}</Badge>
                   ) : null}
                 </Link>
                 <Button variant="ghost" size="icon" aria-label={t("nav.logout")} onClick={signOut}>
