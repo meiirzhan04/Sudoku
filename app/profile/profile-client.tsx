@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
+import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +31,6 @@ import {
 import { useLanguage } from "@/components/providers/language-provider";
 import { useToast } from "@/components/ui/toast";
 import { languageNames, Locale, locales } from "@/lib/i18n/messages";
-import { createClient } from "@/lib/supabase/client";
 import { formatSeconds, initials } from "@/lib/utils";
 
 type ProfileState = {
@@ -51,10 +51,33 @@ type GameHistory = {
   accuracy: number;
 };
 
+type BackendUser = {
+  id: string;
+  fullName: string;
+  username: string;
+  email: string;
+  city?: string | null;
+  avatarUrl?: string | null;
+  language: Locale;
+  stats?: {
+    gamesPlayed: number;
+    wins: number;
+    bestTimeSeconds?: number | null;
+    averageAccuracy?: number | string | null;
+    bestStreak: number;
+    friendsCount: number;
+  };
+};
+
+function backendUrl() {
+  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+}
+
 export function ProfileClient() {
   const { t, locale, setLocale } = useLanguage();
   const { setTheme } = useTheme();
   const { toast } = useToast();
+  const router = useRouter();
   const [profile, setProfile] = useState<ProfileState>({
     full_name: "",
     username: "",
@@ -64,42 +87,61 @@ export function ProfileClient() {
     theme: "system"
   });
   const [games, setGames] = useState<GameHistory[]>([]);
+  const [backendStats, setBackendStats] = useState<BackendUser["stats"]>();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = createClient();
-    if (!supabase) {
+    const token = window.localStorage.getItem("sudokumind-access-token");
+    if (!token) {
       setLoading(false);
+      router.replace("/login?next=/profile");
       return;
     }
 
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return;
-      const [{ data: profileData }, { data: gameData }] = await Promise.all([
-        supabase.from("profiles").select("*").eq("id", data.user.id).single(),
-        supabase
-          .from("games")
-          .select("id, created_at, difficulty, elapsed_seconds, mistakes, accuracy")
-          .eq("user_id", data.user.id)
-          .order("created_at", { ascending: false })
-          .limit(20)
-      ]);
-      if (profileData) {
-        setProfile({
-          full_name: profileData.full_name ?? "",
-          username: profileData.username ?? "",
-          city: profileData.city ?? "",
-          avatar_url: profileData.avatar_url ?? "",
-          language: profileData.language ?? locale,
-          theme: profileData.theme ?? "system"
-        });
+    fetch(`${backendUrl()}/api/users/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Accept-Language": locale
       }
-      setGames((gameData as GameHistory[]) ?? []);
-      setLoading(false);
-    });
-  }, [locale]);
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          window.localStorage.removeItem("sudokumind-access-token");
+          window.localStorage.removeItem("sudokumind-refresh-token");
+          document.cookie = "sm_access_token=; path=/; max-age=0; SameSite=Lax";
+          router.replace("/login?next=/profile");
+          return;
+        }
+
+        const user = (await response.json()) as BackendUser;
+        setProfile({
+          full_name: user.fullName ?? "",
+          username: user.username ?? "",
+          city: user.city ?? "",
+          avatar_url: user.avatarUrl ?? "",
+          language: user.language ?? locale,
+          theme: "system"
+        });
+        setBackendStats(user.stats);
+        setGames([]);
+      })
+      .catch(() => {
+        toast({ title: "Failed to load profile", variant: "error" });
+      })
+      .finally(() => setLoading(false));
+  }, [locale, router, toast]);
 
   const stats = useMemo(() => {
+    if (backendStats) {
+      const averageAccuracy = Number(backendStats.averageAccuracy ?? 0);
+      return {
+        games: backendStats.gamesPlayed,
+        avg: backendStats.bestTimeSeconds ?? 0,
+        accuracy: Math.round(averageAccuracy || 100),
+        streak: backendStats.bestStreak
+      };
+    }
+
     const completed = games.filter((game) => game.elapsed_seconds > 0);
     const avg = completed.length
       ? Math.round(completed.reduce((sum, game) => sum + game.elapsed_seconds, 0) / completed.length)
@@ -108,45 +150,79 @@ export function ProfileClient() {
       ? Math.round(completed.reduce((sum, game) => sum + Number(game.accuracy ?? 100), 0) / completed.length)
       : 100;
     return { games: games.length, avg, accuracy, streak: Math.min(games.length, 12) };
-  }, [games]);
+  }, [backendStats, games]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const supabase = createClient();
-    const {
-      data: { user }
-    } = (await supabase?.auth.getUser()) ?? { data: { user: null } };
-    if (!supabase || !user) return;
-
-    const form = new FormData(event.currentTarget);
-    const file = form.get("avatar") as File | null;
-    let avatarUrl = profile.avatar_url;
-
-    if (file?.size) {
-      const ext = file.name.split(".").pop() ?? "png";
-      const path = `${user.id}/avatar.${ext}`;
-      const upload = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
-      if (!upload.error) {
-        avatarUrl = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
-      }
+    const token = window.localStorage.getItem("sudokumind-access-token");
+    if (!token) {
+      router.replace("/login?next=/profile");
+      return;
     }
 
-    const nextProfile = { ...profile, avatar_url: avatarUrl };
-    const { error } = await supabase.from("profiles").update(nextProfile).eq("id", user.id);
-    if (error) toast({ title: error.message, variant: "error" });
-    else {
-      setLocale(nextProfile.language);
-      setTheme(nextProfile.theme);
-      setProfile(nextProfile);
-      toast({ title: t("common.success"), variant: "success" });
+    const response = await fetch(`${backendUrl()}/api/users/me`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Accept-Language": locale
+      },
+      body: JSON.stringify({
+        fullName: profile.full_name,
+        username: profile.username,
+        city: profile.city,
+        avatarUrl: profile.avatar_url,
+        language: profile.language
+      })
+    });
+
+    if (!response.ok) {
+      toast({ title: await readApiError(response), variant: "error" });
+      return;
     }
+
+    const user = (await response.json()) as BackendUser;
+    const nextProfile = {
+      ...profile,
+      full_name: user.fullName ?? "",
+      username: user.username ?? "",
+      city: user.city ?? "",
+      avatar_url: user.avatarUrl ?? "",
+      language: user.language ?? profile.language
+    };
+    setBackendStats(user.stats);
+    setLocale(nextProfile.language);
+    setTheme(nextProfile.theme);
+    setProfile(nextProfile);
+    toast({ title: t("common.success"), variant: "success" });
   }
 
   async function deleteAccount() {
-    const supabase = createClient();
-    await fetch("/api/account/delete", { method: "DELETE" });
-    await supabase?.auth.signOut();
+    const token = window.localStorage.getItem("sudokumind-access-token");
+    if (token) {
+      await fetch(`${backendUrl()}/api/users/me`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Accept-Language": locale
+        }
+      });
+    }
+
+    window.localStorage.removeItem("sudokumind-access-token");
+    window.localStorage.removeItem("sudokumind-refresh-token");
+    window.localStorage.removeItem("sudokumind-remember");
+    document.cookie = "sm_access_token=; path=/; max-age=0; SameSite=Lax";
     window.location.href = "/";
+  }
+
+  async function readApiError(response: Response) {
+    try {
+      const data = (await response.json()) as { message?: string; error?: string };
+      return data.message ?? data.error ?? "Request failed";
+    } catch {
+      return "Request failed";
+    }
   }
 
   if (loading) {
