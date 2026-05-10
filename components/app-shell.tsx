@@ -84,12 +84,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b border-border/70 bg-background/78 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex min-h-16 w-full max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:flex-nowrap sm:gap-3 sm:px-6 lg:px-8">
           <Link href="/" className="group flex items-center gap-2 font-semibold">
             <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm shadow-primary/25 transition-transform group-hover:-translate-y-0.5">
               <Brain className="h-5 w-5" />
             </span>
-            <span className="tracking-tight">SudokuMind</span>
+            <span className="hidden tracking-tight min-[380px]:inline">SudokuMind</span>
           </Link>
 
           <nav className="ms-2 hidden items-center gap-1 rounded-md border bg-card/60 p-1 md:flex">
@@ -100,11 +100,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             ))}
           </nav>
 
-          <div className="ms-auto flex items-center gap-2">
+          <div className="ms-auto flex min-w-0 items-center gap-1 sm:gap-2">
             <div className="flex items-center gap-2">
-              <Globe2 className="h-4 w-4 text-muted-foreground" />
+              <Globe2 className="hidden h-4 w-4 text-muted-foreground sm:block" />
               <Select value={locale} onValueChange={(value) => setLocale(value as Locale)}>
-                <SelectTrigger className="h-9 w-[92px] sm:w-[132px]">
+                <SelectTrigger className="h-9 w-[86px] sm:w-[132px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

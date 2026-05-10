@@ -76,6 +76,12 @@ public class GameService {
         game.setElapsedSeconds(request.elapsedSeconds());
         game.setHintsUsed(request.hintsUsed());
         game.setAccuracy(accuracy(request.currentBoard(), request.mistakes()));
+        if (sudokuEngine.matchesSolution(request.currentBoard(), game.getSolution())) {
+            game.setStatus(GameStatus.COMPLETED);
+            if (game.getCompletedAt() == null) {
+                game.setCompletedAt(Instant.now());
+            }
+        }
         return mapper.toResponse(repository.save(game));
     }
 

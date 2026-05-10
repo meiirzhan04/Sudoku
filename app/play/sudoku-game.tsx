@@ -27,7 +27,6 @@ import {
   relatedCell
 } from "@/lib/sudoku";
 import { formatSeconds } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
 
 type HistoryItem = {
   entries: Board;
@@ -35,15 +34,34 @@ type HistoryItem = {
   mistakes: number;
 };
 
+type BackendGameSession = {
+  id: string;
+  puzzle: Board;
+  solution: Board;
+  currentBoard: Board;
+  mistakes: number;
+  hintsUsed: number;
+  elapsedSeconds: number;
+};
+
 const digits = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-export function SudokuGame({ daily = false }: { daily?: boolean }) {
+function backendUrl() {
+  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+}
+
+export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolean; dailyChallengeId?: string }) {
   const { t, locale } = useLanguage();
   const { toast } = useToast();
   const [difficulty, setDifficulty] = useState<Difficulty>(daily ? "medium" : "easy");
   const [seed, setSeed] = useState(daily ? dailySeed() : `game-${Date.now()}`);
-  const puzzle = useMemo(() => generateSudoku(difficulty, daily ? dailySeed() : seed), [difficulty, seed, daily]);
-  const [entries, setEntries] = useState<Board>(() => cloneBoard(puzzle.puzzle));
+  const generatedPuzzle = useMemo(() => generateSudoku(difficulty, daily ? dailySeed() : seed), [difficulty, seed, daily]);
+  const [serverGame, setServerGame] = useState<BackendGameSession | null>(null);
+  const activePuzzle = useMemo(
+    () => (!daily && serverGame ? { puzzle: serverGame.puzzle, solution: serverGame.solution } : generatedPuzzle),
+    [daily, generatedPuzzle, serverGame]
+  );
+  const [entries, setEntries] = useState<Board>(() => cloneBoard(activePuzzle.puzzle));
   const [notes, setNotes] = useState<Record<string, number[]>>({});
   const [selected, setSelected] = useState<[number, number] | null>(null);
   const [noteMode, setNoteMode] = useState(false);
@@ -56,27 +74,56 @@ export function SudokuGame({ daily = false }: { daily?: boolean }) {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [future, setFuture] = useState<HistoryItem[]>([]);
   const [guest, setGuest] = useState(true);
+  const [savedDailyChallengeId, setSavedDailyChallengeId] = useState<string>();
+  const [completedServerGameId, setCompletedServerGameId] = useState<string>();
+  const [winToastKey, setWinToastKey] = useState<string>();
 
-  const given = useMemo(() => puzzle.puzzle.map((row) => row.map((value) => value !== 0)), [puzzle.puzzle]);
-  const solved = boardComplete(entries, puzzle.solution);
-
-  useEffect(() => {
-    const supabase = createClient();
-    supabase?.auth.getUser().then(({ data }) => setGuest(!data.user));
-  }, []);
+  const given = useMemo(() => activePuzzle.puzzle.map((row) => row.map((value) => value !== 0)), [activePuzzle.puzzle]);
+  const solved = boardComplete(entries, activePuzzle.solution);
 
   useEffect(() => {
-    setEntries(cloneBoard(puzzle.puzzle));
+    const token = window.localStorage.getItem("sudokumind-access-token");
+    setGuest(!token);
+
+    if (!token || daily) {
+      setServerGame(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    fetch(`${backendUrl()}/api/games`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ difficulty: difficulty.toUpperCase() }),
+      signal: controller.signal
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((game: BackendGameSession | null) => {
+        if (game) setServerGame(game);
+      })
+      .catch(() => undefined);
+
+    return () => controller.abort();
+  }, [daily, difficulty, seed]);
+
+  useEffect(() => {
+    setEntries(cloneBoard(!daily && serverGame ? serverGame.currentBoard : activePuzzle.puzzle));
     setNotes({});
     setSelected(null);
-    setMistakes(0);
-    setElapsed(0);
+    setMistakes(!daily && serverGame ? serverGame.mistakes : 0);
+    setElapsed(!daily && serverGame ? serverGame.elapsedSeconds : 0);
     setPaused(false);
-    setHintsUsed(0);
+    setHintsUsed(!daily && serverGame ? serverGame.hintsUsed : 0);
     setCoach(t("game.selectCell"));
     setHistory([]);
     setFuture([]);
-  }, [puzzle.puzzle, t]);
+    setSavedDailyChallengeId(undefined);
+    setCompletedServerGameId(undefined);
+    setWinToastKey(undefined);
+  }, [activePuzzle.puzzle, daily, serverGame, t]);
 
   useEffect(() => {
     if (paused || solved) return;
@@ -86,8 +133,8 @@ export function SudokuGame({ daily = false }: { daily?: boolean }) {
 
   const autosave = useCallback(() => {
     const payload = {
-      puzzle: puzzle.puzzle,
-      solution: puzzle.solution,
+      puzzle: activePuzzle.puzzle,
+      solution: activePuzzle.solution,
       entries,
       notes,
       difficulty,
@@ -97,24 +144,67 @@ export function SudokuGame({ daily = false }: { daily?: boolean }) {
       completed: solved
     };
     window.localStorage.setItem("sudokumind-current-game", JSON.stringify(payload));
-    fetch("/api/games/autosave", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    }).catch(() => undefined);
-    if (daily && solved) {
-      fetch("/api/daily/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+    if (guest) return;
+
+    const token = window.localStorage.getItem("sudokumind-access-token");
+    if (!token) return;
+
+    if (!daily && serverGame) {
+      fetch(`${backendUrl()}/api/games/${serverGame.id}/save`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
-          puzzle_date: dailySeed(),
-          elapsed_seconds: elapsed,
+          currentBoard: entries,
+          mistakes,
+          elapsedSeconds: elapsed,
+          hintsUsed
+        })
+      }).catch(() => undefined);
+
+      if (solved && completedServerGameId !== serverGame.id) {
+        setCompletedServerGameId(serverGame.id);
+        fetch(`${backendUrl()}/api/games/${serverGame.id}/complete`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => undefined);
+      }
+    }
+
+    if (daily && solved && dailyChallengeId && savedDailyChallengeId !== dailyChallengeId) {
+      setSavedDailyChallengeId(dailyChallengeId);
+      fetch(`${backendUrl()}/api/daily/${dailyChallengeId}/submit`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          timeSeconds: elapsed,
           mistakes,
           accuracy: accuracy(entries, mistakes)
         })
       }).catch(() => undefined);
     }
-  }, [daily, difficulty, elapsed, entries, mistakes, notes, puzzle.puzzle, puzzle.solution, solved]);
+  }, [
+    activePuzzle.puzzle,
+    activePuzzle.solution,
+    completedServerGameId,
+    daily,
+    dailyChallengeId,
+    difficulty,
+    elapsed,
+    entries,
+    guest,
+    hintsUsed,
+    mistakes,
+    notes,
+    savedDailyChallengeId,
+    serverGame,
+    solved
+  ]);
 
   useEffect(() => {
     const saver = window.setInterval(autosave, 10000);
@@ -123,9 +213,12 @@ export function SudokuGame({ daily = false }: { daily?: boolean }) {
 
   useEffect(() => {
     if (!solved) return;
+    const key = daily ? `daily-${dailySeed()}` : serverGame?.id ?? seed;
+    if (winToastKey === key) return;
+    setWinToastKey(key);
     autosave();
     toast({ title: t("game.win"), variant: "success" });
-  }, [autosave, solved, t, toast]);
+  }, [autosave, daily, seed, serverGame?.id, solved, t, toast, winToastKey]);
 
   const snapshot = useCallback(() => {
     setHistory((items) => [...items, { entries: cloneBoard(entries), notes: { ...notes }, mistakes }].slice(-60));
@@ -159,11 +252,11 @@ export function SudokuGame({ daily = false }: { daily?: boolean }) {
       return copy;
     });
 
-    if (puzzle.solution[row][col] !== digit) {
+    if (activePuzzle.solution[row][col] !== digit) {
       setMistakes((value) => value + 1);
       toast({ title: t("game.wrong"), variant: "error" });
     }
-  }, [given, noteMode, paused, puzzle.solution, snapshot, solved, t, toast]);
+  }, [activePuzzle.solution, given, noteMode, paused, snapshot, solved, t, toast]);
 
   const clearCell = useCallback(() => {
     if (!selected) return;
@@ -238,7 +331,7 @@ export function SudokuGame({ daily = false }: { daily?: boolean }) {
       return;
     }
     const [row, col] = selected;
-    const digit = puzzle.solution[row][col];
+    const digit = activePuzzle.solution[row][col];
     setHintsUsed((value) => value + 1);
     const response = await fetch("/api/ai/hint", {
       method: "POST",
@@ -248,7 +341,7 @@ export function SudokuGame({ daily = false }: { daily?: boolean }) {
         row,
         col,
         digit,
-        puzzle: puzzle.puzzle,
+        puzzle: activePuzzle.puzzle,
         entries,
         candidates: getCandidates(entries, row, col)
       })
@@ -336,14 +429,14 @@ export function SudokuGame({ daily = false }: { daily?: boolean }) {
             </label>
           </div>
 
-        <div className="relative mx-auto grid w-full max-w-[min(92vw,620px)] grid-cols-9 overflow-hidden p-3">
+        <div className="relative mx-auto grid w-full max-w-[min(92vw,620px)] touch-manipulation grid-cols-9 overflow-hidden p-2 sm:p-3">
           {solved ? <Confetti /> : null}
           {entries.map((row, rowIndex) =>
             row.map((value, colIndex) => {
               const isSelected = selected?.[0] === rowIndex && selected?.[1] === colIndex;
               const isRelated = selected ? relatedCell(selected, [rowIndex, colIndex]) : false;
               const sameValue = selectedValue && value === selectedValue;
-              const isWrong = value !== 0 && value !== puzzle.solution[rowIndex][colIndex];
+              const isWrong = value !== 0 && value !== activePuzzle.solution[rowIndex][colIndex];
               return (
                 <motion.button
                   key={`${rowIndex}-${colIndex}`}
@@ -351,7 +444,7 @@ export function SudokuGame({ daily = false }: { daily?: boolean }) {
                   animate={isSelected ? { scale: 1.03 } : { scale: 1 }}
                   onClick={() => setSelected([rowIndex, colIndex])}
                   className={[
-                    "relative aspect-square border bg-background/85 text-xl font-semibold shadow-[inset_0_1px_0_hsl(var(--foreground)/0.03)] transition-colors sm:text-2xl",
+                    "relative aspect-square border bg-background/85 text-base font-semibold shadow-[inset_0_1px_0_hsl(var(--foreground)/0.03)] transition-colors min-[380px]:text-xl sm:text-2xl",
                     given[rowIndex][colIndex] ? "text-foreground" : "text-primary",
                     isRelated ? "bg-accent/70" : "",
                     sameValue ? "bg-primary/10 text-primary" : "",

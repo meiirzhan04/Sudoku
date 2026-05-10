@@ -69,6 +69,15 @@ type BackendUser = {
   };
 };
 
+type BackendGameHistory = {
+  id: string;
+  createdAt: string;
+  difficulty: string;
+  elapsedSeconds: number;
+  mistakes: number;
+  accuracy: number | string;
+};
+
 function backendUrl() {
   return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 }
@@ -123,7 +132,26 @@ export function ProfileClient() {
           theme: "system"
         });
         setBackendStats(user.stats);
-        setGames([]);
+        fetch(`${backendUrl()}/api/games/history`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Accept-Language": locale
+          }
+        })
+          .then((historyResponse) => (historyResponse.ok ? historyResponse.json() : []))
+          .then((history: BackendGameHistory[]) =>
+            setGames(
+              history.map((game) => ({
+                id: game.id,
+                created_at: game.createdAt,
+                difficulty: game.difficulty.toLowerCase(),
+                elapsed_seconds: game.elapsedSeconds,
+                mistakes: game.mistakes,
+                accuracy: Number(game.accuracy ?? 100)
+              }))
+            )
+          )
+          .catch(() => setGames([]));
       })
       .catch(() => {
         toast({ title: "Failed to load profile", variant: "error" });

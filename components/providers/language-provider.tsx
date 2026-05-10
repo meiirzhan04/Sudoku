@@ -45,11 +45,6 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     setLocaleState(nextLocale);
     document.documentElement.lang = nextLocale;
     window.localStorage.setItem("sudokumind-language", nextLocale);
-    fetch("/api/profile/language", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ language: nextLocale })
-    }).catch(() => undefined);
   }, []);
 
   const t = useCallback(

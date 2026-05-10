@@ -19,14 +19,14 @@ export default function HomePage() {
     <div className="relative overflow-hidden">
       <div className="premium-grid pointer-events-none absolute inset-x-0 top-0 h-[520px]" />
       <div className="page-shell relative">
-        <section className="grid min-h-[calc(100vh-7rem)] items-center gap-10 lg:grid-cols-[1fr_0.92fr]">
+        <section className="grid min-h-[calc(100vh-7rem)] items-center gap-8 py-4 lg:grid-cols-[1fr_0.92fr] lg:gap-10">
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="space-y-7">
           <div className="inline-flex items-center gap-2 rounded-full border bg-card/80 px-3 py-1 text-sm text-muted-foreground shadow-sm backdrop-blur">
             <Brain className="h-4 w-4 text-primary" />
             {t("landing.features")}
           </div>
           <div className="space-y-4">
-            <h1 className="text-balance max-w-3xl text-5xl font-semibold tracking-tight sm:text-6xl lg:text-7xl">
+            <h1 className="text-balance max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl lg:text-7xl">
               {t("landing.tagline")}
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-muted-foreground">{t("landing.sub")}</p>
@@ -42,7 +42,7 @@ export default function HomePage() {
               <Link href="/daily">{t("landing.ctaDaily")}</Link>
             </Button>
           </div>
-          <div className="grid max-w-xl grid-cols-3 gap-3 pt-2">
+          <div className="grid max-w-xl grid-cols-1 gap-3 pt-2 min-[420px]:grid-cols-3">
             <Metric icon={Clock3} label="avg solve" value="08:42" />
             <Metric icon={ShieldCheck} label="accuracy" value="96%" />
             <Metric icon={Zap} label="streak" value="12" />

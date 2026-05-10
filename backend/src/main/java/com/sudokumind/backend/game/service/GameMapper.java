@@ -10,6 +10,7 @@ public class GameMapper {
         return new GameSessionResponse(
                 game.getId(),
                 game.getPuzzle(),
+                game.getSolution(),
                 game.getCurrentBoard(),
                 game.getDifficulty(),
                 game.getStatus(),

@@ -6,7 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/components/providers/language-provider";
-import { createClient } from "@/lib/supabase/client";
+
+function backendUrl() {
+  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+}
 
 export default function ForgotPasswordPage() {
   const { t } = useLanguage();
@@ -14,12 +17,13 @@ export default function ForgotPasswordPage() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const supabase = createClient();
     const email = String(new FormData(event.currentTarget).get("email"));
-    const { error } = await supabase?.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`
-    }) ?? { error: new Error("Supabase is not configured") };
-    setMessage(error ? error.message : t("auth.resetSent"));
+    const response = await fetch(`${backendUrl()}/api/auth/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+    setMessage(response.ok ? t("auth.resetSent") : "Request failed");
   }
 
   return (

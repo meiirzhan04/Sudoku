@@ -65,7 +65,7 @@ public class AuthService {
         user.setProvider(AuthProvider.LOCAL);
         user.setEmailVerified(false);
         userRepository.save(user);
-        return new RegisterResponse("Registration successful. Please check your email.", user.getId());
+        return new RegisterResponse("Registration successful.", user.getId());
     }
 
     @Transactional

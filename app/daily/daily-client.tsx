@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/components/providers/language-provider";
-import { dailySeed } from "@/lib/sudoku";
 import { formatSeconds } from "@/lib/utils";
 
 type LeaderboardRow = {
@@ -19,12 +18,29 @@ type LeaderboardRow = {
   is_pro: boolean;
 };
 
+type BackendDailyChallenge = {
+  id: string;
+};
+
+type BackendLeaderboardRow = {
+  rank: number;
+  username: string;
+  city: string | null;
+  timeSeconds: number;
+  mistakes: number;
+  isPro: boolean;
+};
+
+function backendUrl() {
+  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+}
+
 export function DailyClient() {
   const { t } = useLanguage();
   const [city, setCity] = useState("");
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
+  const [challengeId, setChallengeId] = useState<string>();
   const [now, setNow] = useState(() => new Date());
-  const date = dailySeed();
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -32,10 +48,39 @@ export function DailyClient() {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams({ date });
+    fetch(`${backendUrl()}/api/daily/today`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: BackendDailyChallenge | null) => setChallengeId(data?.id))
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!challengeId) return;
+    const token = window.localStorage.getItem("sudokumind-access-token");
+    if (!token) return;
+
+    const params = new URLSearchParams();
     if (city) params.set("city", city);
-    fetch(`/api/daily/leaderboard?${params}`).then((res) => res.json()).then((data) => setRows(data.rows ?? []));
-  }, [city, date]);
+    const query = params.toString();
+
+    fetch(`${backendUrl()}/api/daily/${challengeId}/leaderboard${query ? `?${query}` : ""}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: BackendLeaderboardRow[]) =>
+        setRows(
+          data.map((row) => ({
+            rank: row.rank,
+            username: row.username,
+            city: row.city,
+            elapsed_seconds: row.timeSeconds,
+            mistakes: row.mistakes,
+            is_pro: row.isPro
+          }))
+        )
+      )
+      .catch(() => setRows([]));
+  }, [challengeId, city]);
 
   const countdown = useMemo(() => {
     const next = new Date(now);
@@ -56,7 +101,7 @@ export function DailyClient() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <SudokuGame daily />
+        <SudokuGame daily dailyChallengeId={challengeId} />
         <Card>
           <CardHeader>
             <CardTitle>{t("daily.leaderboard")}</CardTitle>

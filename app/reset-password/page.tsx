@@ -7,7 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/components/providers/language-provider";
-import { createClient } from "@/lib/supabase/client";
+
+function backendUrl() {
+  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+}
 
 export default function ResetPasswordPage() {
   const { t } = useLanguage();
@@ -23,10 +26,14 @@ export default function ResetPasswordPage() {
       setMessage(t("auth.mismatch"));
       return;
     }
-    const supabase = createClient();
-    const { error } = await supabase?.auth.updateUser({ password }) ?? { error: new Error("Supabase is not configured") };
-    if (error) setMessage(error.message);
-    else router.push("/login");
+    const token = new URLSearchParams(window.location.search).get("token") ?? "";
+    const response = await fetch(`${backendUrl()}/api/auth/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, password, confirmPassword: confirm })
+    });
+    if (response.ok) router.push("/login");
+    else setMessage("Request failed");
   }
 
   return (

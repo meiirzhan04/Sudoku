@@ -54,7 +54,10 @@ export function AuthCard({ mode }: { mode: Mode }) {
     try {
       if (mode === "register") {
         await register(form, email, password);
-        router.push("/check-email");
+        await login(form, email, password);
+        toast({ title: t("common.success"), variant: "success" });
+        router.push("/play");
+        router.refresh();
       } else {
         await login(form, email, password);
         toast({ title: t("auth.signIn"), variant: "success" });
