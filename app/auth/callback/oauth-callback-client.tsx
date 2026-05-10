@@ -11,21 +11,44 @@ export function OAuthCallbackClient() {
   const { t } = useLanguage();
 
   useEffect(() => {
-    const accessToken = searchParams.get("accessToken");
-    const refreshToken = searchParams.get("refreshToken");
+    let cancelled = false;
 
-    if (!accessToken || !refreshToken) {
-      router.replace("/login");
-      return;
+    async function finishOAuth() {
+      const accessToken = searchParams.get("accessToken");
+      const refreshToken = searchParams.get("refreshToken");
+
+      if (!accessToken || !refreshToken) {
+        router.replace("/login");
+        return;
+      }
+
+      window.localStorage.setItem("sudokumind-access-token", accessToken);
+      window.localStorage.setItem("sudokumind-refresh-token", refreshToken);
+      window.localStorage.setItem("sudokumind-remember", "30");
+      document.cookie = `sm_access_token=${accessToken}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+
+      window.dispatchEvent(new Event("sudokumind-auth-updated"));
+
+      try {
+        await fetch("/api/auth/me", {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        });
+      } catch {
+        // The dashboard still has the token and will retry through React Query.
+      }
+
+      if (!cancelled) {
+        router.replace("/dashboard");
+        router.refresh();
+      }
     }
 
-    window.localStorage.setItem("sudokumind-access-token", accessToken);
-    window.localStorage.setItem("sudokumind-refresh-token", refreshToken);
-    window.localStorage.setItem("sudokumind-remember", "30");
-    window.dispatchEvent(new Event("sudokumind-auth-updated"));
-    document.cookie = `sm_access_token=${accessToken}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
-    router.replace("/dashboard");
-    router.refresh();
+    finishOAuth();
+    return () => {
+      cancelled = true;
+    };
   }, [router, searchParams]);
 
   return (

@@ -99,6 +99,9 @@ const dashboardCopy: Record<Locale, {
   completedGames: string;
   currentRank: string;
   starter: string;
+  levelTitle: (level: number) => string;
+  starterRank: string;
+  weekdayLabels: string[];
   streakTitle: string;
   startToday: string;
   dayStreak: (days: number) => string;
@@ -115,6 +118,7 @@ const dashboardCopy: Record<Locale, {
   available: string;
   shareStreak: string;
   level: (level: number) => string;
+  streakBonusValue: string;
   xpLeft: string;
   dailyChallenge: string;
   battleWin: string;
@@ -176,6 +180,9 @@ const dashboardCopy: Record<Locale, {
     completedGames: "Completed Games",
     currentRank: "Current Rank",
     starter: "Starter",
+    levelTitle: (level) => `Level ${level} Brain Trainer`,
+    starterRank: "Starter",
+    weekdayLabels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     streakTitle: "Current Streak",
     startToday: "Start today",
     dayStreak: (days) => `${days} Day Streak`,
@@ -197,6 +204,7 @@ const dashboardCopy: Record<Locale, {
     battleWin: "Battle Win",
     noMistakes: "No Mistakes",
     streakBonus: "Streak Bonus",
+    streakBonusValue: "+20/day",
     continueGame: "Continue Game",
     difficulty: "Difficulty",
     time: "Time",
@@ -253,14 +261,17 @@ const dashboardCopy: Record<Locale, {
     completedGames: "Завершено игр",
     currentRank: "Текущий ранг",
     starter: "Новичок",
+    levelTitle: (level) => `Уровень ${level}`,
+    starterRank: "Новичок",
+    weekdayLabels: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"],
     streakTitle: "Текущий стрик",
     startToday: "Начни сегодня",
     dayStreak: (days) => `${days} дней стрика`,
     firstStreak: "Начни свой первый стрик сегодня.",
     streakSafe: "Мозг в форме. Стрик на сегодня защищён.",
     extendStreak: "Одна головоломка до продления стрика.",
-    playDaily: "Играть Daily Challenge",
-    dailyDone: "Daily выполнен",
+    playDaily: "Играть ежедневное",
+    dailyDone: "Ежедневное выполнено",
     continueStreak: "Продлить стрик",
     today: "Сегодня",
     longestStreak: "Лучший стрик",
@@ -270,10 +281,11 @@ const dashboardCopy: Record<Locale, {
     shareStreak: "Поделиться стриком",
     level: (level) => `Уровень ${level} Brain Trainer`,
     xpLeft: "XP осталось",
-    dailyChallenge: "Daily Challenge",
+    dailyChallenge: "Ежедневное",
     battleWin: "Победа в битве",
     noMistakes: "Без ошибок",
     streakBonus: "Бонус стрика",
+    streakBonusValue: "+20/день",
     continueGame: "Продолжить игру",
     difficulty: "Сложность",
     time: "Время",
@@ -281,7 +293,7 @@ const dashboardCopy: Record<Locale, {
     continue: "Продолжить",
     noGame: "Незавершённых игр нет. Начни новую и набери темп.",
     startNewGame: "Новая игра",
-    todaysChallenge: "Сегодняшний Challenge",
+    todaysChallenge: "Сегодняшнее испытание",
     completedDaily: "Выполнено. Стрик сегодня в безопасности.",
     dailyText: "Пройди сегодняшнюю головоломку, чтобы продлить стрик.",
     viewLeaderboard: "Открыть рейтинг",
@@ -297,7 +309,7 @@ const dashboardCopy: Record<Locale, {
     themesText: "Classic, Neon, Minimal, Dark Glass, Ocean и Cyberpunk скины.",
     explorePro: "Смотреть Pro",
     dailyGoal: "Цель дня",
-    goals: ["Пройти 1 головоломку сегодня", "Использовать не больше 2 подсказок", "Завершить одну Medium головоломку", "Выиграть одну Battle"],
+    goals: ["Пройти 1 головоломку сегодня", "Использовать не больше 2 подсказок", "Завершить одну среднюю головоломку", "Выиграть одну битву"],
     done: "Готово",
     completedBadge: "Бейдж получен. XP начислен, стрик защищён.",
     daysToPush: (days) => `${days} дней до следующего большого рывка стрика.`,
@@ -330,14 +342,17 @@ const dashboardCopy: Record<Locale, {
     completedGames: "Аяқталған ойындар",
     currentRank: "Қазіргі ранг",
     starter: "Бастаушы",
+    levelTitle: (level) => `${level}-деңгей`,
+    starterRank: "Бастаушы",
+    weekdayLabels: ["Дс", "Сс", "Ср", "Бс", "Жм", "Сб", "Жс"],
     streakTitle: "Қазіргі стрик",
     startToday: "Бүгін баста",
     dayStreak: (days) => `${days} күндік стрик`,
     firstStreak: "Алғашқы стрикті бүгін баста.",
     streakSafe: "Миың сергек. Бүгінгі стрик қорғалды.",
     extendStreak: "Стрикті ұзартуға бір puzzle қалды.",
-    playDaily: "Daily Challenge ойнау",
-    dailyDone: "Daily аяқталды",
+    playDaily: "Күнделікті ойнау",
+    dailyDone: "Күнделікті аяқталды",
     continueStreak: "Стрикті ұзарту",
     today: "Бүгін",
     longestStreak: "Ең ұзақ стрик",
@@ -347,10 +362,11 @@ const dashboardCopy: Record<Locale, {
     shareStreak: "Стрикпен бөлісу",
     level: (level) => `${level}-деңгей Brain Trainer`,
     xpLeft: "XP қалды",
-    dailyChallenge: "Daily Challenge",
+    dailyChallenge: "Күнделікті",
     battleWin: "Battle жеңісі",
     noMistakes: "Қатесіз",
     streakBonus: "Стрик бонусы",
+    streakBonusValue: "+20/күн",
     continueGame: "Ойынды жалғастыру",
     difficulty: "Қиындық",
     time: "Уақыт",
@@ -358,7 +374,7 @@ const dashboardCopy: Record<Locale, {
     continue: "Жалғастыру",
     noGame: "Аяқталмаған ойын жоқ. Жаңасын бастап, қарқын ал.",
     startNewGame: "Жаңа ойын",
-    todaysChallenge: "Бүгінгі Challenge",
+    todaysChallenge: "Бүгінгі сынақ",
     completedDaily: "Аяқталды. Бүгін стрик қауіпсіз.",
     dailyText: "Стрикті жалғастыру үшін бүгінгі puzzle-ды аяқта.",
     viewLeaderboard: "Рейтингті ашу",
@@ -474,6 +490,7 @@ export default function HomePage() {
   const dailyGoalDone = completedToday;
   const loading = isAuthed && (dashboardQuery.isLoading || activeGameQuery.isLoading || dailyStatusQuery.isLoading);
   const username = dashboard?.fullName || dashboard?.username || "there";
+  const displayedRank = !dashboard?.currentRank || dashboard.currentRank.toLowerCase() === "starter" ? c.starterRank : dashboard.currentRank;
 
   useEffect(() => {
     if (!isAuthed) return;
@@ -552,7 +569,7 @@ export default function HomePage() {
           <DashboardMetric icon={Trophy} label={c.bestTime} value={habit.bestTimeSeconds ? formatSeconds(habit.bestTimeSeconds) : "--:--"} />
           <DashboardMetric icon={Shield} label={c.accuracy} value={`${habit.averageAccuracy}%`} />
           <DashboardMetric icon={BarChart3} label={c.completedGames} value={habit.gamesCompleted} />
-          <DashboardMetric icon={Medal} label={c.currentRank} value={dashboard?.currentRank ?? c.starter} />
+          <DashboardMetric icon={Medal} label={c.currentRank} value={displayedRank} />
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -689,9 +706,9 @@ function StreakCard({
         </div>
 
         <div className="grid grid-cols-7 gap-2">
-          {week.map((day) => (
+          {week.map((day, index) => (
             <div key={day.key} className="space-y-2 text-center">
-              <div className="text-xs text-muted-foreground">{day.label}</div>
+              <div className="text-xs text-muted-foreground">{c.weekdayLabels[index]}</div>
               <div
                 className={[
                   "mx-auto flex h-9 w-9 items-center justify-center rounded-full border text-xs font-semibold transition-all",
@@ -699,7 +716,7 @@ function StreakCard({
                   day.today ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""
                 ].join(" ")}
               >
-                {day.completed ? "✓" : day.today ? c.today : ""}
+                {day.completed ? "✓" : day.today ? "•" : ""}
               </div>
             </div>
           ))}
@@ -729,7 +746,7 @@ function LevelCard({ habit, progress, c }: { habit: HabitState; progress: Return
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Zap className="h-5 w-5 text-primary" />
-          {c.level(habit.level)}
+          {c.levelTitle(habit.level)}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -751,7 +768,7 @@ function LevelCard({ habit, progress, c }: { habit: HabitState; progress: Return
           <MiniStat label={c.dailyChallenge} value="+100 XP" />
           <MiniStat label={c.battleWin} value="+150 XP" />
           <MiniStat label={c.noMistakes} value="+75 XP" />
-          <MiniStat label={c.streakBonus} value="+20/day" />
+          <MiniStat label={c.streakBonus} value={c.streakBonusValue} />
         </div>
       </CardContent>
     </Card>
@@ -769,7 +786,7 @@ function ContinueGameCard({ game, c }: { game: ContinueGame | null; c: typeof da
         {game ? (
           <>
             <div className="grid grid-cols-3 gap-2">
-              <MiniStat label={c.difficulty} value={game.difficulty ?? "Medium"} />
+              <MiniStat label={c.difficulty} value={formatDifficulty(game.difficulty, c)} />
               <MiniStat label={c.time} value={formatSeconds(game.elapsed_seconds ?? 0)} />
               <MiniStat label={c.mistakes} value={game.mistakes ?? 0} />
             </div>
@@ -861,7 +878,7 @@ function WeeklyChart({ week, c }: { week: ReturnType<typeof weeklyProgress>; c: 
       </CardHeader>
       <CardContent>
         <div className="flex h-48 items-end gap-3">
-          {week.map((day) => (
+          {week.map((day, index) => (
             <div key={day.key} className="flex flex-1 flex-col items-center gap-2">
               <div className="flex h-36 w-full items-end rounded-md bg-muted/50 p-1">
                 <motion.div
@@ -871,7 +888,7 @@ function WeeklyChart({ week, c }: { week: ReturnType<typeof weeklyProgress>; c: 
                 />
               </div>
               <div className={["text-xs", day.today ? "font-semibold text-primary" : "text-muted-foreground"].join(" ")}>
-                {day.label}
+                {c.weekdayLabels[index]}
               </div>
             </div>
           ))}
@@ -965,4 +982,13 @@ function smartRecommendation(habit: HabitState, c: typeof dashboardCopy.en) {
     return c.recommendations.hard;
   }
   return c.recommendations.start;
+}
+
+function formatDifficulty(difficulty: string | undefined, c: typeof dashboardCopy.en) {
+  const value = difficulty?.toLowerCase();
+  if (value === "easy") return c === dashboardCopy.ru ? "Лёгкая" : c === dashboardCopy.kk ? "Оңай" : "Easy";
+  if (value === "medium") return c === dashboardCopy.ru ? "Средняя" : c === dashboardCopy.kk ? "Орташа" : "Medium";
+  if (value === "hard") return c === dashboardCopy.ru ? "Сложная" : c === dashboardCopy.kk ? "Қиын" : "Hard";
+  if (value === "expert") return c === dashboardCopy.ru ? "Эксперт" : c === dashboardCopy.kk ? "Эксперт" : "Expert";
+  return difficulty ?? (c === dashboardCopy.ru ? "Средняя" : c === dashboardCopy.kk ? "Орташа" : "Medium");
 }

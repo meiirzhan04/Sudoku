@@ -1,14 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Crown, Globe2, LogOut, Moon, SunMedium, UserRound } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -16,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/components/providers/language-provider";
 import { Locale, locales } from "@/lib/i18n/messages";
 import { initials } from "@/lib/utils";
@@ -31,9 +31,9 @@ type SessionUser = {
 };
 
 const languageNames: Record<Locale, string> = {
-  en: "🇬🇧 English",
-  ru: "🇷🇺 Русский",
-  kk: "🇰🇿 Қазақша"
+  en: "EN English",
+  ru: "RU Русский",
+  kk: "KZ Қазақша"
 };
 
 const navCopy: Record<Locale, { battle: string; leaderboard: string; pricing: string; settings: string; profile: string; proBadge: string }> = {
@@ -71,14 +71,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { theme, setTheme } = useTheme();
   const [user, setUser] = useState<SessionUser | null>(null);
 
-  useEffect(() => {
+  const loadUser = useCallback(() => {
     const token = window.localStorage.getItem("sudokumind-access-token");
     if (!token) {
       setUser(null);
       return;
     }
 
-    fetch(`/api/auth/me`, {
+    fetch("/api/auth/me", {
       headers: {
         Authorization: `Bearer ${token}`,
         "Accept-Language": locale
@@ -97,6 +97,16 @@ export function AppShell({ children }: { children: ReactNode }) {
       })
       .catch(() => setUser(null));
   }, [locale]);
+
+  useEffect(() => {
+    loadUser();
+    window.addEventListener("storage", loadUser);
+    window.addEventListener("sudokumind-auth-updated", loadUser);
+    return () => {
+      window.removeEventListener("storage", loadUser);
+      window.removeEventListener("sudokumind-auth-updated", loadUser);
+    };
+  }, [loadUser]);
 
   const links = [
     { href: "/play", label: t("nav.play") },
@@ -119,16 +129,16 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-border/70 bg-background/78 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex min-h-16 w-full max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:flex-nowrap sm:gap-3 sm:px-6 lg:px-8">
-          <Link href="/" className="group flex items-center gap-2 font-semibold">
+          <Link href="/" className="group flex shrink-0 items-center gap-2 font-semibold">
             <Image src="/favicon.svg" alt="SudokuMind" width={36} height={36} className="rounded-md shadow-sm shadow-primary/25 transition-transform group-hover:-translate-y-0.5" priority />
             <span className="hidden tracking-tight min-[380px]:inline">SudokuMind</span>
           </Link>
 
-          <nav className="ms-2 hidden items-center gap-1 rounded-md border bg-card/60 p-1 lg:flex">
+          <nav className="ms-2 hidden min-w-0 items-center gap-1 rounded-md border bg-card/60 p-1 lg:flex">
             {links.map((link) => (
-              <Button key={link.href} variant={pathname === link.href ? "secondary" : "ghost"} size="sm" asChild>
+              <Button key={link.href} variant={pathname === link.href ? "secondary" : "ghost"} size="sm" asChild className="shrink-0">
                 <Link href={link.href}>{link.label}</Link>
               </Button>
             ))}
@@ -138,7 +148,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="flex items-center gap-2">
               <Globe2 className="hidden h-4 w-4 text-muted-foreground sm:block" />
               <Select value={locale} onValueChange={(value) => setLocale(value as Locale)}>
-                <SelectTrigger className="h-9 w-[86px] sm:w-[132px]">
+                <SelectTrigger className="h-9 w-[104px] sm:w-[132px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -199,9 +209,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-      <nav className="sticky top-16 z-30 flex gap-1 overflow-x-auto border-b bg-background/88 px-3 py-2 backdrop-blur lg:hidden">
+      <nav className="sticky top-16 z-30 flex gap-1 overflow-x-auto border-b bg-background/90 px-3 py-2 backdrop-blur lg:hidden">
         {links.map((link) => (
-          <Button key={link.href} variant={pathname === link.href ? "secondary" : "ghost"} size="sm" asChild>
+          <Button key={link.href} variant={pathname === link.href ? "secondary" : "ghost"} size="sm" asChild className="shrink-0">
             <Link href={link.href}>{link.label}</Link>
           </Button>
         ))}

@@ -780,20 +780,24 @@ function SettingField({ label, defaultValue = "", type = "text", helper, onChang
 function Toggle({ label, defaultChecked = false, checked, onChange }: { label: string; defaultChecked?: boolean; checked?: boolean; onChange?: (value: boolean) => void }) {
   const [internal, setInternal] = useState(defaultChecked);
   const value = checked ?? internal;
+  function toggle() {
+    setInternal(!value);
+    onChange?.(!value);
+  }
+
   return (
-    <label className="flex items-center justify-between gap-3 rounded-lg border bg-background/60 p-3">
-      <span className="text-sm font-medium">{label}</span>
-      <button
-        type="button"
-        onClick={() => {
-          setInternal(!value);
-          onChange?.(!value);
-        }}
-        className={["relative h-6 w-11 rounded-full transition-colors", value ? "bg-primary" : "bg-muted"].join(" ")}
-      >
-        <span className={["absolute top-1 h-4 w-4 rounded-full bg-white transition-transform", value ? "translate-x-5" : "translate-x-1"].join(" ")} />
-      </button>
-    </label>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={value}
+      onClick={toggle}
+      className="flex min-h-12 w-full items-center justify-between gap-4 rounded-lg border bg-background/60 px-4 py-3 text-left transition-colors hover:bg-accent/40"
+    >
+      <span className="min-w-0 pr-2 text-sm font-medium leading-5">{label}</span>
+      <span className={["relative h-6 w-11 shrink-0 rounded-full transition-colors", value ? "bg-primary" : "bg-muted"].join(" ")}>
+        <span className={["absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform", value ? "translate-x-5" : "translate-x-0"].join(" ")} />
+      </span>
+    </button>
   );
 }
 
