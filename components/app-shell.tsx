@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Crown, Globe2, LogOut, Moon, SunMedium, UserRound } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState, type ReactNode } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -171,7 +172,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Button>
         ))}
       </nav>
-      <main>{children}</main>
+      <AnimatePresence mode="wait">
+        <motion.main
+          key={pathname}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+        >
+          {children}
+        </motion.main>
+      </AnimatePresence>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Bot, Clock3, Lightbulb, Pause, Pencil, Play, RotateCcw, RotateCw, ShieldAlert, Sparkles } from "lucide-react";
+import { Bot, Clock3, Lightbulb, Loader2, Pause, Pencil, Play, RotateCcw, RotateCw, ShieldAlert, Sparkles, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,6 +85,10 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
   const [savedDailyChallengeId, setSavedDailyChallengeId] = useState<string>();
   const [completedServerGameId, setCompletedServerGameId] = useState<string>();
   const [winToastKey, setWinToastKey] = useState<string>();
+  const [lastMove, setLastMove] = useState<{ row: number; col: number; correct: boolean; nonce: number }>();
+  const [hinting, setHinting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [showWin, setShowWin] = useState(false);
 
   const given = useMemo(() => activePuzzle.puzzle.map((row) => row.map((value) => value !== 0)), [activePuzzle.puzzle]);
   const solved = boardComplete(entries, activePuzzle.solution);
@@ -139,6 +143,13 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
     return () => window.clearInterval(timer);
   }, [paused, solved]);
 
+  useEffect(() => {
+    document.title = !solved && elapsed > 0 ? `⏱ ${formatSeconds(elapsed)} — SudokuMind` : "SudokuMind";
+    return () => {
+      document.title = "SudokuMind";
+    };
+  }, [elapsed, solved]);
+
   const autosave = useCallback(() => {
     const payload = {
       puzzle: activePuzzle.puzzle,
@@ -158,6 +169,7 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
     if (!token) return;
 
     if (!daily && serverGame) {
+      setSaving(true);
       fetch(`${backendUrl()}/api/games/${serverGame.id}/save`, {
         method: "PUT",
         headers: {
@@ -170,7 +182,10 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
           elapsedSeconds: elapsed,
           hintsUsed
         })
-      }).catch(() => undefined);
+      })
+        .then(() => toast({ title: "✅ Игра сохранена", variant: "success" }))
+        .catch(() => toast({ title: "❌ Не удалось сохранить — повторяем попытку...", variant: "error" }))
+        .finally(() => setSaving(false));
 
       if (solved && completedServerGameId !== serverGame.id) {
         setCompletedServerGameId(serverGame.id);
@@ -211,7 +226,8 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
     notes,
     savedDailyChallengeId,
     serverGame,
-    solved
+    solved,
+    toast
   ]);
 
   useEffect(() => {
@@ -230,6 +246,7 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
         mistakes,
         accuracy: accuracy(entries, mistakes)
       });
+      toast({ title: `✅ Стрик продлён! +100 XP получено`, variant: "success" });
     } else {
       recordCompletedGame({
         elapsedSeconds: elapsed,
@@ -237,9 +254,11 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
         accuracy: accuracy(entries, mistakes),
         difficulty
       });
+      toast({ title: "✅ +50 XP получено!", variant: "success" });
     }
     autosave();
     toast({ title: t("game.win"), variant: "success" });
+    setShowWin(true);
   }, [autosave, daily, difficulty, elapsed, entries, mistakes, seed, serverGame?.id, solved, t, toast, winToastKey]);
 
   const snapshot = useCallback(() => {
@@ -274,9 +293,12 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
       return copy;
     });
 
-    if (activePuzzle.solution[row][col] !== digit) {
+    const correct = activePuzzle.solution[row][col] === digit;
+    setLastMove({ row, col, correct, nonce: Date.now() });
+    if (!correct) {
       setMistakes((value) => value + 1);
       toast({ title: t("game.wrong"), variant: "error" });
+      navigator.vibrate?.(40);
     }
   }, [activePuzzle.solution, given, noteMode, paused, snapshot, solved, t, toast]);
 
@@ -318,6 +340,21 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
+      if (event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        setPaused((value) => !value);
+        return;
+      }
+      if (event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        setNoteMode((value) => !value);
+        return;
+      }
+      if (event.key.toLowerCase() === "h") {
+        event.preventDefault();
+        void explain();
+        return;
+      }
       if (!selected) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && event.shiftKey) {
         event.preventDefault();
@@ -341,6 +378,8 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+    // explain is a stable function declaration for the current render; hotkeys should track selected/setCell state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clearCell, redo, selected, setCell, undo]);
 
   async function explain() {
@@ -354,6 +393,7 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
     }
     const [row, col] = selected;
     const digit = activePuzzle.solution[row][col];
+    setHinting(true);
     setHintsUsed((value) => value + 1);
     const response = await fetch("/api/ai/hint", {
       method: "POST",
@@ -367,7 +407,10 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
         entries,
         candidates: getCandidates(entries, row, col)
       })
-    }).then((res) => res.json());
+    })
+      .then((res) => res.json())
+      .finally(() => setHinting(false));
+    setLastMove({ row, col, correct: true, nonce: Date.now() });
     setCoach(response.message ?? t("ai.fallback", { digit }));
   }
 
@@ -409,12 +452,13 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
             </div>
             <div className="grid grid-cols-3 gap-2 sm:min-w-[320px]">
               <GameMetric icon={Clock3} label={t("common.time")} value={formatSeconds(elapsed)} />
-              <GameMetric icon={ShieldAlert} label={t("common.mistakes")} value={`${mistakes}${hardcore ? "/3" : ""}`} danger={hardcore && mistakes >= 3} />
+              <GameMetric icon={ShieldAlert} label={t("common.mistakes")} value={`${mistakes}${hardcore ? "/3" : ""}`} danger={hardcore && mistakes >= 3} pulse={lastMove?.correct === false} />
               <GameMetric icon={Lightbulb} label={t("game.hintsLeft")} value={String(Math.max(0, 5 - hintsUsed))} />
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 border-b p-3">
+            {saving ? <span className="rounded-md border bg-background/70 px-3 py-2 text-xs text-muted-foreground">Сохраняем...</span> : null}
             {!daily ? (
               <Select value={difficulty} onValueChange={(value) => setDifficulty(value as Difficulty)}>
                 <SelectTrigger className="w-[140px] bg-background/70">
@@ -452,7 +496,7 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
             </label>
           </div>
 
-        <div className="relative mx-auto grid w-full max-w-[min(92vw,620px)] touch-manipulation grid-cols-9 overflow-hidden p-2 sm:p-3">
+        <div className={["relative mx-auto grid w-full max-w-[min(100vw,620px)] touch-manipulation grid-cols-9 overflow-hidden p-1 transition-all sm:max-w-[min(92vw,620px)] sm:p-3", paused ? "blur-sm" : ""].join(" ")}>
           {solved ? <Confetti /> : null}
           {entries.map((row, rowIndex) =>
             row.map((value, colIndex) => {
@@ -460,11 +504,12 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
               const isRelated = selected ? relatedCell(selected, [rowIndex, colIndex]) : false;
               const sameValue = selectedValue && value === selectedValue;
               const isWrong = value !== 0 && value !== activePuzzle.solution[rowIndex][colIndex];
+              const isLast = lastMove?.row === rowIndex && lastMove?.col === colIndex;
               return (
                 <motion.button
-                  key={`${rowIndex}-${colIndex}`}
+                  key={`${rowIndex}-${colIndex}-${isLast ? lastMove?.nonce : "idle"}`}
                   whileTap={{ scale: 0.96 }}
-                  animate={isSelected ? { scale: 1.03 } : { scale: 1 }}
+                  animate={isLast && lastMove?.correct ? { scale: [1, 1.05, 1] } : isSelected ? { scale: 1.03 } : { scale: 1 }}
                   onClick={() => setSelected([rowIndex, colIndex])}
                   className={[
                     "relative aspect-square border bg-background/85 text-base font-semibold shadow-[inset_0_1px_0_hsl(var(--foreground)/0.03)] transition-colors min-[380px]:text-xl sm:text-2xl",
@@ -472,7 +517,9 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
                     isRelated ? "bg-accent/70" : "",
                     sameValue ? "bg-primary/10 text-primary" : "",
                     isSelected ? "z-10 bg-primary text-primary-foreground shadow-lg shadow-primary/20 ring-2 ring-primary ring-offset-2 ring-offset-card" : "",
-                    isWrong ? "animate-shake text-destructive" : ""
+                    isWrong || (isLast && lastMove?.correct === false) ? "animate-shake bg-destructive/15 text-destructive" : "",
+                    isLast && lastMove?.correct ? "bg-emerald-400/20 shadow-[0_0_22px_hsl(160_84%_45%/0.35)]" : "",
+                    hinting && isSelected ? "animate-pulse shadow-[0_0_28px_hsl(var(--primary)/0.4)]" : ""
                   ].join(" ")}
                   style={{
                     borderRightWidth: colIndex === 2 || colIndex === 5 ? 2 : 1,
@@ -487,12 +534,12 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
         </div>
         </div>
 
-        <div className="mx-auto grid w-full max-w-[min(92vw,620px)] grid-cols-9 gap-2">
+        <div className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-9 gap-1 border-t bg-background/95 p-2 backdrop-blur sm:static sm:mx-auto sm:w-full sm:max-w-[min(92vw,620px)] sm:gap-2 sm:border-0 sm:bg-transparent sm:p-0">
           {digits.map((digit) => (
             <Button
               key={digit}
               variant="secondary"
-              className="aspect-square h-auto px-0 text-lg"
+              className="min-h-14 px-0 text-lg sm:aspect-square sm:h-auto"
               onClick={() => selected && setCell(selected[0], selected[1], digit)}
             >
               {digit}
@@ -515,13 +562,35 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
               <span>{t("game.hintsLeft")}</span>
               <span>{Math.max(0, 5 - hintsUsed)}</span>
             </div>
-            <Button className="w-full" onClick={explain}>
-              <Lightbulb className="h-4 w-4" />
-              {t("game.explain")}
+            <Button className="w-full" onClick={explain} disabled={hinting}>
+              {hinting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lightbulb className="h-4 w-4" />}
+              {hinting ? "Думаю..." : t("game.explain")}
             </Button>
           </CardContent>
         </Card>
       </aside>
+      {showWin ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-background/70 p-4 backdrop-blur-sm sm:items-center">
+          <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="w-full max-w-md">
+            <Card className="overflow-hidden border-primary/30 shadow-soft">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-primary" />
+                  Puzzle solved
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-3 gap-2">
+                  <GameMetric icon={Clock3} label="Time" value={formatSeconds(elapsed)} />
+                  <GameMetric icon={ShieldAlert} label="Mistakes" value={mistakes} />
+                  <GameMetric icon={Lightbulb} label="Accuracy" value={`${accuracy(entries, mistakes)}%`} />
+                </div>
+                <Button className="w-full" onClick={() => setShowWin(false)}>Continue</Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -530,21 +599,26 @@ function GameMetric({
   icon: Icon,
   label,
   value,
-  danger
+  danger,
+  pulse
 }: {
   icon: typeof Clock3;
   label: string;
-  value: string;
+  value: string | number;
   danger?: boolean;
+  pulse?: boolean;
 }) {
   return (
-    <div className={["rounded-lg border bg-background/70 p-3", danger ? "border-destructive/45 text-destructive" : ""].join(" ")}>
+    <motion.div
+      animate={pulse ? { x: [0, -4, 4, 0], color: "hsl(var(--destructive))" } : {}}
+      className={["rounded-lg border bg-background/70 p-3", danger ? "border-destructive/45 text-destructive" : ""].join(" ")}
+    >
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Icon className="h-3.5 w-3.5" />
         {label}
       </div>
       <div className="mt-1 font-mono text-lg font-semibold">{value}</div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -571,7 +645,7 @@ function Confetti() {
 
 function Notes({ values }: { values: number[] }) {
   return (
-    <span className="grid h-full w-full grid-cols-3 grid-rows-3 p-1 text-[10px] font-medium text-muted-foreground sm:text-xs">
+    <span className="grid h-full w-full grid-cols-3 grid-rows-3 p-1 text-[10px] italic text-muted-foreground sm:text-xs">
       {digits.map((digit) => (
         <span key={digit} className="flex items-center justify-center">
           {values.includes(digit) ? digit : ""}

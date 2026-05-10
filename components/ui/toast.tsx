@@ -1,13 +1,14 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { CheckCircle2, Info, XCircle } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 type Toast = {
   id: number;
   title: string;
-  variant?: "default" | "error" | "success";
+  variant?: "default" | "error" | "success" | "info";
 };
 
 const ToastContext = createContext<{ toast: (toast: Omit<Toast, "id">) => void } | null>(null);
@@ -33,16 +34,20 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           {toasts.map((item) => (
             <motion.div
               key={item.id}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 12 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
               className={cn(
-                "rounded-md border bg-card px-4 py-3 text-sm shadow-soft",
+                "flex items-center gap-3 rounded-md border bg-card px-4 py-3 text-sm shadow-soft",
                 item.variant === "error" && "border-destructive text-destructive",
-                item.variant === "success" && "border-primary text-foreground"
+                item.variant === "success" && "border-primary text-foreground",
+                item.variant === "info" && "border-sky-400/50 text-foreground"
               )}
             >
-              {item.title}
+              {item.variant === "success" ? <CheckCircle2 className="h-4 w-4 text-primary" /> : null}
+              {item.variant === "error" ? <XCircle className="h-4 w-4 text-destructive" /> : null}
+              {item.variant === "info" || !item.variant ? <Info className="h-4 w-4 text-sky-400" /> : null}
+              <span>{item.title}</span>
             </motion.div>
           ))}
         </AnimatePresence>

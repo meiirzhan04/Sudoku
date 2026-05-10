@@ -48,6 +48,10 @@
     @apply border-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background font-sans text-foreground antialiased;
     min-height: 100vh;
@@ -55,6 +59,15 @@
       linear-gradient(to bottom, hsl(var(--background) / 0.92), hsl(var(--background))),
       linear-gradient(120deg, hsl(166 82% 36% / 0.12), transparent 34%, hsl(248 65% 62% / 0.10) 70%, transparent);
     font-feature-settings: "ss01", "cv05", "cv11";
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role="button"] {
+    transition-duration: 200ms;
   }
 
   ::selection {
