@@ -23,17 +23,6 @@ spring:
   messages:
     basename: messages
     encoding: UTF-8
-  security:
-    oauth2:
-      client:
-        registration:
-          google:
-            client-id: ${GOOGLE_CLIENT_ID:}
-            client-secret: ${GOOGLE_CLIENT_SECRET:}
-            scope:
-              - openid
-              - profile
-              - email
 
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
@@ -44,6 +33,9 @@ app:
     refresh-token-remember-days: 30
   oauth2:
     success-redirect-path: ${OAUTH_SUCCESS_REDIRECT_PATH:/auth/callback}
+    google:
+      client-id: ${GOOGLE_CLIENT_ID:}
+      client-secret: ${GOOGLE_CLIENT_SECRET:}
   anthropic:
     api-key: ${ANTHROPIC_API_KEY:}
     model: ${ANTHROPIC_MODEL:claude-sonnet-4-20250514}

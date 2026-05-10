@@ -2,6 +2,7 @@ package com.sudokumind.backend.config;
 
 import com.sudokumind.backend.auth.security.JwtAuthenticationFilter;
 import com.sudokumind.backend.auth.security.OAuth2SuccessHandler;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +14,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -26,7 +28,8 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtAuthenticationFilter jwtAuthenticationFilter,
-            OAuth2SuccessHandler oAuth2SuccessHandler
+            OAuth2SuccessHandler oAuth2SuccessHandler,
+            ObjectProvider<ClientRegistrationRepository> clientRegistrationRepository
     ) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
@@ -51,8 +54,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/daily/today").permitAll()
                         .anyRequest().authenticated()
                 )
-                .oauth2Login(oauth -> oauth.successHandler(oAuth2SuccessHandler))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        if (clientRegistrationRepository.getIfAvailable() != null) {
+            http.oauth2Login(oauth -> oauth.successHandler(oAuth2SuccessHandler));
+        }
 
         return http.build();
     }
