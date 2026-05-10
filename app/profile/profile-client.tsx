@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { LockKeyhole, LogIn, Trash2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -100,6 +101,7 @@ export function ProfileClient() {
   const [backendStats, setBackendStats] = useState<BackendUser["stats"]>();
   const [habit, setHabit] = useState<HabitState>(() => emptyHabitState());
   const [loading, setLoading] = useState(true);
+  const [authRequired, setAuthRequired] = useState(false);
 
   useEffect(() => {
     const refresh = () => setHabit(loadHabitState());
@@ -112,7 +114,7 @@ export function ProfileClient() {
     const token = window.localStorage.getItem("sudokumind-access-token");
     if (!token) {
       setLoading(false);
-      router.replace("/login?next=/profile");
+      setAuthRequired(true);
       return;
     }
 
@@ -127,11 +129,12 @@ export function ProfileClient() {
           window.localStorage.removeItem("sudokumind-access-token");
           window.localStorage.removeItem("sudokumind-refresh-token");
           document.cookie = "sm_access_token=; path=/; max-age=0; SameSite=Lax";
-          router.replace("/login?next=/profile");
+          setAuthRequired(true);
           return;
         }
 
         const user = (await response.json()) as BackendUser;
+        setAuthRequired(false);
         setProfile({
           full_name: user.fullName ?? "",
           username: user.username ?? "",
@@ -164,6 +167,7 @@ export function ProfileClient() {
       })
       .catch(() => {
         toast({ title: "Failed to load profile", variant: "error" });
+        setAuthRequired(true);
       })
       .finally(() => setLoading(false));
   }, [locale, router, toast]);
@@ -274,6 +278,10 @@ export function ProfileClient() {
         <div className="skeleton h-80" />
       </div>
     );
+  }
+
+  if (authRequired) {
+    return <AuthRequired />;
   }
 
   return (
@@ -402,6 +410,40 @@ export function ProfileClient() {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function AuthRequired() {
+  return (
+    <div className="page-shell">
+      <Card className="mx-auto max-w-xl overflow-hidden border-primary/20 bg-card/90 shadow-soft backdrop-blur">
+        <CardHeader className="space-y-4 border-b bg-muted/25">
+          <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <LockKeyhole className="h-6 w-6" />
+          </div>
+          <div>
+            <CardTitle className="text-2xl">Profile is private</CardTitle>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Create an account or log in to see your profile, saved games, streak, XP and statistics.
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-3 p-6 sm:grid-cols-2">
+          <Button asChild>
+            <Link href="/login?next=/profile">
+              <LogIn className="h-4 w-4" />
+              Log in
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/register">
+              <UserPlus className="h-4 w-4" />
+              Create account
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

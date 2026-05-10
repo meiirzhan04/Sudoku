@@ -72,7 +72,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { href: "/daily", label: t("nav.daily") },
     { href: "/battle", label: "Battle" },
     { href: "/leaderboard", label: "Leaderboard" },
-    { href: "/profile", label: t("nav.profile") },
+    ...(user ? [{ href: "/profile", label: t("nav.profile") }] : []),
     { href: "/pro", label: "Pricing" }
   ];
 
