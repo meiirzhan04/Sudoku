@@ -18,10 +18,16 @@ import java.util.stream.Collectors;
 public class AdminBootstrap implements ApplicationRunner {
     private final UserRepository userRepository;
     private final String adminEmails;
+    private final String adminUsernames;
 
-    public AdminBootstrap(UserRepository userRepository, @Value("${app.admin.emails:}") String adminEmails) {
+    public AdminBootstrap(
+            UserRepository userRepository,
+            @Value("${app.admin.emails:}") String adminEmails,
+            @Value("${app.admin.usernames:}") String adminUsernames
+    ) {
         this.userRepository = userRepository;
         this.adminEmails = adminEmails;
+        this.adminUsernames = adminUsernames;
     }
 
     @Override
@@ -30,11 +36,23 @@ public class AdminBootstrap implements ApplicationRunner {
         for (String email : configuredEmails()) {
             userRepository.findByEmailIgnoreCase(email).ifPresent(this::promote);
         }
+        for (String username : configuredUsernames()) {
+            userRepository.findByUsernameIgnoreCase(username).ifPresent(this::promote);
+        }
     }
 
     public boolean shouldPromote(String email) {
         if (email == null || email.isBlank()) return false;
         return configuredEmails().contains(email.trim().toLowerCase(Locale.ROOT));
+    }
+
+    public boolean shouldPromote(User user) {
+        return user != null && (shouldPromote(user.getEmail()) || shouldPromoteUsername(user.getUsername()));
+    }
+
+    private boolean shouldPromoteUsername(String username) {
+        if (username == null || username.isBlank()) return false;
+        return configuredUsernames().contains(username.trim().toLowerCase(Locale.ROOT));
     }
 
     public User promote(User user) {
@@ -47,6 +65,13 @@ public class AdminBootstrap implements ApplicationRunner {
 
     private Set<String> configuredEmails() {
         return Arrays.stream(adminEmails.split(","))
+                .map(value -> value.trim().toLowerCase(Locale.ROOT))
+                .filter(value -> !value.isBlank())
+                .collect(Collectors.toSet());
+    }
+
+    private Set<String> configuredUsernames() {
+        return Arrays.stream(adminUsernames.split(","))
                 .map(value -> value.trim().toLowerCase(Locale.ROOT))
                 .filter(value -> !value.isBlank())
                 .collect(Collectors.toSet());

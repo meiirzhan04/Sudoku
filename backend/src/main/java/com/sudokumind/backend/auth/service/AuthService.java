@@ -69,7 +69,7 @@ public class AuthService {
         user.setLanguage(request.language() == null ? Language.en : request.language());
         user.setProvider(AuthProvider.LOCAL);
         user.setEmailVerified(false);
-        if (adminBootstrap.shouldPromote(user.getEmail())) {
+        if (adminBootstrap.shouldPromote(user)) {
             user.setRole(com.sudokumind.backend.common.enums.UserRole.ADMIN);
         }
         userRepository.save(user);
@@ -114,7 +114,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponse tokens(User user, boolean rememberMe) {
-        if (adminBootstrap.shouldPromote(user.getEmail())) {
+        if (adminBootstrap.shouldPromote(user)) {
             user = adminBootstrap.promote(user);
         }
         user.setLastSeenAt(Instant.now());
