@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Bot, Clock3, Lightbulb, Loader2, Pause, Pencil, Play, RotateCcw, RotateCw, ShieldAlert, Sparkles, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,10 +41,14 @@ type BackendGameSession = {
   puzzle: Board;
   solution: Board;
   currentBoard: Board;
+  difficulty: string;
   mistakes: number;
   hintsUsed: number;
   elapsedSeconds: number;
 };
+
+type LaunchState = "checking" | "choose" | "active-choice" | "playing";
+type GameMode = "classic" | "hardcore" | "timed";
 
 const digits = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const difficultyLabels: Record<Difficulty, string> = {
@@ -54,14 +59,32 @@ const difficultyLabels: Record<Difficulty, string> = {
   insane: "Insane"
 };
 
+const difficultyOptions: Array<{ value: Difficulty; label: string; estimate: string }> = [
+  { value: "easy", label: "Лёгкая", estimate: "~5м" },
+  { value: "medium", label: "Средняя", estimate: "~10м" },
+  { value: "hard", label: "Сложная", estimate: "~20м" },
+  { value: "expert", label: "Эксперт", estimate: "30м+" }
+];
+
+const modeOptions: Array<{ value: GameMode; label: string }> = [
+  { value: "classic", label: "Классика" },
+  { value: "hardcore", label: "Хардкор" },
+  { value: "timed", label: "На время" }
+];
+
 function backendUrl() {
   return "";
 }
 
-export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolean; dailyChallengeId?: string }) {
+export function SudokuGame({ daily = false, dailyChallengeId, gameId }: { daily?: boolean; dailyChallengeId?: string; gameId?: string }) {
   const { t, locale } = useLanguage();
   const { toast } = useToast();
+  const router = useRouter();
   const [difficulty, setDifficulty] = useState<Difficulty>(daily ? "medium" : "easy");
+  const [mode, setMode] = useState<GameMode>("classic");
+  const [launchState, setLaunchState] = useState<LaunchState>(daily ? "playing" : "checking");
+  const [pendingActiveGame, setPendingActiveGame] = useState<BackendGameSession | null>(null);
+  const [starting, setStarting] = useState(false);
   const [seed, setSeed] = useState(daily ? dailySeed() : `game-${Date.now()}`);
   const generatedPuzzle = useMemo(() => generateSudoku(difficulty, daily ? dailySeed() : seed), [difficulty, seed, daily]);
   const [serverGame, setServerGame] = useState<BackendGameSession | null>(null);
@@ -97,29 +120,59 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
     const token = window.localStorage.getItem("sudokumind-access-token");
     setGuest(!token);
 
-    if (!token || daily) {
+    if (daily) {
+      setLaunchState("playing");
+      return;
+    }
+
+    const savedDifficulty = window.localStorage.getItem("sudokumind-last-difficulty") as Difficulty | null;
+    if (savedDifficulty && difficultyOptions.some((item) => item.value === savedDifficulty)) {
+      setDifficulty(savedDifficulty);
+    }
+
+    if (!token) {
       setServerGame(null);
+      setPendingActiveGame(null);
+      setLaunchState("choose");
       return;
     }
 
     const controller = new AbortController();
-    fetch(`${backendUrl()}/api/games`, {
-      method: "POST",
+    const url = gameId ? `${backendUrl()}/api/games/${gameId}` : `${backendUrl()}/api/games/active`;
+    fetch(url, {
       headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
+        Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ difficulty: difficulty.toUpperCase() }),
       signal: controller.signal
     })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((game: BackendGameSession | null) => {
-        if (game) setServerGame(game);
+      .then((response) => {
+        if (response.status === 404) return null;
+        return response.ok ? response.json() : null;
       })
-      .catch(() => undefined);
+      .then((game: BackendGameSession | null) => {
+        if (gameId) {
+          if (game) {
+            setServerGame(game);
+            setDifficulty(game.difficulty.toLowerCase() as Difficulty);
+            setLaunchState("playing");
+          } else {
+            setLaunchState("choose");
+          }
+          return;
+        }
+        if (game) {
+          setPendingActiveGame(game);
+          setDifficulty(game.difficulty.toLowerCase() as Difficulty);
+          setLaunchState("active-choice");
+        } else {
+          setPendingActiveGame(null);
+          setLaunchState("choose");
+        }
+      })
+      .catch(() => setLaunchState("choose"));
 
     return () => controller.abort();
-  }, [daily, difficulty, seed]);
+  }, [daily, gameId]);
 
   useEffect(() => {
     setEntries(cloneBoard(!daily && serverGame ? serverGame.currentBoard : activePuzzle.puzzle));
@@ -138,10 +191,10 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
   }, [activePuzzle.puzzle, daily, serverGame, t]);
 
   useEffect(() => {
-    if (paused || solved) return;
+    if (launchState !== "playing" || paused || solved) return;
     const timer = window.setInterval(() => setElapsed((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
-  }, [paused, solved]);
+  }, [launchState, paused, solved]);
 
   useEffect(() => {
     document.title = !solved && elapsed > 0 ? `⏱ ${formatSeconds(elapsed)} — SudokuMind` : "SudokuMind";
@@ -231,9 +284,10 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
   ]);
 
   useEffect(() => {
+    if (launchState !== "playing") return;
     const saver = window.setInterval(autosave, 10000);
     return () => window.clearInterval(saver);
-  }, [autosave]);
+  }, [autosave, launchState]);
 
   useEffect(() => {
     if (!solved) return;
@@ -254,6 +308,8 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
         accuracy: accuracy(entries, mistakes),
         difficulty
       });
+      toast({ title: "🎯 Цель выполнена! +50 XP", variant: "success" });
+      window.dispatchEvent(new Event("sudokumind-daily-goal-completed"));
       toast({ title: "✅ +50 XP получено!", variant: "success" });
     }
     autosave();
@@ -414,8 +470,62 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
     setCoach(response.message ?? t("ai.fallback", { digit }));
   }
 
+  async function beginGame(nextDifficulty = difficulty, nextMode = mode) {
+    window.localStorage.setItem("sudokumind-last-difficulty", nextDifficulty);
+    setDifficulty(nextDifficulty);
+    setMode(nextMode);
+    setHardcore(nextMode === "hardcore");
+    setStarting(true);
+
+    const token = window.localStorage.getItem("sudokumind-access-token");
+    if (!token) {
+      setServerGame(null);
+      setPendingActiveGame(null);
+      setSeed(`game-${Date.now()}`);
+      setLaunchState("playing");
+      setStarting(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${backendUrl()}/api/games/new`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ difficulty: nextDifficulty.toUpperCase(), mode: nextMode })
+      });
+      if (!response.ok) throw new Error("Game was not created");
+      const game = (await response.json()) as BackendGameSession;
+      setServerGame(game);
+      setPendingActiveGame(null);
+      setLaunchState("playing");
+      router.push(`/play/${game.id}`);
+    } catch {
+      toast({ title: "Не удалось начать игру", variant: "error" });
+      setLaunchState("choose");
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  function continueActiveGame() {
+    if (!pendingActiveGame) return;
+    setServerGame(pendingActiveGame);
+    setDifficulty(pendingActiveGame.difficulty.toLowerCase() as Difficulty);
+    setLaunchState("playing");
+    router.push(`/play/${pendingActiveGame.id}`);
+  }
+
   function newGame() {
-    setSeed(`game-${Date.now()}`);
+    if (daily) {
+      setSeed(`game-${Date.now()}`);
+      return;
+    }
+    setPendingActiveGame(null);
+    setServerGame(null);
+    setLaunchState("choose");
   }
 
   function share() {
@@ -431,6 +541,88 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
   }
 
   const selectedValue = selected ? entries[selected[0]][selected[1]] : 0;
+
+  if (!daily && launchState !== "playing") {
+    return (
+      <div className="mx-auto w-full max-w-3xl">
+        {launchState === "checking" ? (
+          <Card className="shadow-soft">
+            <CardContent className="flex items-center gap-3 p-6 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              Проверяем активную игру...
+            </CardContent>
+          </Card>
+        ) : launchState === "active-choice" && pendingActiveGame ? (
+          <Card className="overflow-hidden border-primary/30 shadow-soft">
+            <CardHeader>
+              <CardTitle>У тебя есть незаконченная игра</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid gap-2 sm:grid-cols-4">
+                <GameMetric icon={Sparkles} label="Сложность" value={difficultyLabelRu(pendingActiveGame.difficulty)} />
+                <GameMetric icon={Clock3} label="Время" value={formatSeconds(pendingActiveGame.elapsedSeconds)} />
+                <GameMetric icon={ShieldAlert} label="Ошибки" value={pendingActiveGame.mistakes} />
+                <GameMetric icon={Trophy} label="Прогресс" value={`${Math.round((pendingActiveGame.currentBoard.flat().filter(Boolean).length / 81) * 100)}%`} />
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button className="flex-1" onClick={continueActiveGame}>Продолжить</Button>
+                <Button className="flex-1" variant="outline" onClick={() => setLaunchState("choose")}>Начать новую</Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="overflow-hidden shadow-soft">
+            <CardHeader>
+              <CardTitle>Новая игра</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <div className="mb-3 text-sm font-medium text-muted-foreground">Выбери сложность:</div>
+                <div className="grid gap-2 sm:grid-cols-4">
+                  {difficultyOptions.map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setDifficulty(item.value)}
+                      className={[
+                        "rounded-lg border p-4 text-left transition hover:border-primary/60",
+                        difficulty === item.value ? "border-primary bg-primary/10 text-primary" : "bg-background/60"
+                      ].join(" ")}
+                    >
+                      <div className="font-semibold">{item.label}</div>
+                      <div className="text-sm text-muted-foreground">{item.estimate}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-3 text-sm font-medium text-muted-foreground">Режим:</div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {modeOptions.map((item) => (
+                    <label key={item.value} className="flex items-center gap-2 rounded-lg border bg-background/60 p-3">
+                      <input
+                        type="radio"
+                        name="game-mode"
+                        checked={mode === item.value}
+                        onChange={() => setMode(item.value)}
+                      />
+                      {item.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <Button className="w-full" size="lg" onClick={() => void beginGame()} disabled={starting}>
+                {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                Начать игру
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={daily ? "grid gap-6" : "grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]"}>
@@ -496,7 +688,7 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
             </label>
           </div>
 
-        <div className={["relative mx-auto grid w-full max-w-[min(100vw,620px)] touch-manipulation grid-cols-9 overflow-hidden p-1 transition-all sm:max-w-[min(92vw,620px)] sm:p-3", paused ? "blur-sm" : ""].join(" ")}>
+        <div className={["relative mx-auto grid w-full max-w-[min(100vw,620px)] touch-manipulation grid-cols-9 overflow-hidden p-0 transition-all sm:max-w-[min(92vw,620px)] sm:p-3", paused ? "blur-sm" : ""].join(" ")}>
           {solved ? <Confetti /> : null}
           {entries.map((row, rowIndex) =>
             row.map((value, colIndex) => {
@@ -534,7 +726,7 @@ export function SudokuGame({ daily = false, dailyChallengeId }: { daily?: boolea
         </div>
         </div>
 
-        <div className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-9 gap-1 border-t bg-background/95 p-2 backdrop-blur sm:static sm:mx-auto sm:w-full sm:max-w-[min(92vw,620px)] sm:gap-2 sm:border-0 sm:bg-transparent sm:p-0">
+        <div className="fixed inset-x-0 bottom-[58px] z-30 grid grid-cols-9 gap-1 border-t bg-background/95 p-2 backdrop-blur sm:static sm:mx-auto sm:w-full sm:max-w-[min(92vw,620px)] sm:gap-2 sm:border-0 sm:bg-transparent sm:p-0">
           {digits.map((digit) => (
             <Button
               key={digit}
@@ -659,4 +851,13 @@ function accuracy(entries: Board, mistakes: number) {
   const filled = entries.flat().filter(Boolean).length;
   if (!filled) return 100;
   return Math.max(0, Math.round(((filled - mistakes) / filled) * 100));
+}
+
+function difficultyLabelRu(value: string) {
+  const difficulty = value.toLowerCase();
+  if (difficulty === "easy") return "Лёгкая";
+  if (difficulty === "medium") return "Средняя";
+  if (difficulty === "hard") return "Сложная";
+  if (difficulty === "expert") return "Эксперт";
+  return value;
 }

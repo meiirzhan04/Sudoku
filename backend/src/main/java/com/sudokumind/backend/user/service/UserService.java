@@ -2,23 +2,22 @@ package com.sudokumind.backend.user.service;
 
 import com.sudokumind.backend.common.exception.ApiException;
 import com.sudokumind.backend.common.exception.ErrorCode;
+import com.sudokumind.backend.common.enums.Difficulty;
 import com.sudokumind.backend.common.enums.UserRole;
 import com.sudokumind.backend.daily.entity.DailyResult;
 import com.sudokumind.backend.daily.repository.DailyResultRepository;
 import com.sudokumind.backend.friends.repository.FriendRepository;
 import com.sudokumind.backend.game.repository.GameSessionRepository;
-import com.sudokumind.backend.user.dto.DashboardResponse;
-import com.sudokumind.backend.user.dto.PublicUserResponse;
-import com.sudokumind.backend.user.dto.UpdateProfileRequest;
-import com.sudokumind.backend.user.dto.UserResponse;
-import com.sudokumind.backend.user.dto.UserStatsDto;
+import com.sudokumind.backend.user.dto.*;
 import com.sudokumind.backend.user.entity.User;
 import com.sudokumind.backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -134,6 +133,20 @@ public class UserService {
                 completedDates.contains(LocalDate.now()),
                 rank
         );
+    }
+
+    public DailyGoalsResponse dailyGoals(UUID userId) {
+        Instant todayStart = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant();
+        boolean completedAny = gameSessionRepository.countCompletedByUserIdSince(userId, todayStart) > 0;
+        boolean lowHints = gameSessionRepository.countCompletedByUserIdWithHintsAtMostSince(userId, 2, todayStart) > 0;
+        boolean mediumDone = gameSessionRepository.countCompletedByUserIdAndDifficultySince(userId, Difficulty.MEDIUM, todayStart) > 0;
+
+        return new DailyGoalsResponse(List.of(
+                new DailyGoalResponse("complete-one", "Пройти 1 головоломку сегодня", 50, completedAny),
+                new DailyGoalResponse("low-hints", "Использовать не больше 2 подсказок", 50, lowHints),
+                new DailyGoalResponse("medium-one", "Завершить одну среднюю головоломку", 50, mediumDone),
+                new DailyGoalResponse("battle-win", "Выиграть одну битву", 150, false)
+        ));
     }
 
     private int currentStreak(Set<LocalDate> completedDates) {

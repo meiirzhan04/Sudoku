@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Crown, Globe2, LogOut, Moon, SunMedium, UserRound } from "lucide-react";
+import { Crown, Gamepad2, Globe2, Home, LogOut, Moon, Settings, SunMedium, UserRound } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -70,19 +70,26 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const loadUser = useCallback(() => {
     const token = window.localStorage.getItem("sudokumind-access-token");
     if (!token) {
       setUser(null);
+      setAuthChecked(true);
       return;
     }
 
-    fetch("/api/auth/me", {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 1800);
+
+    fetch("/api/users/me", {
       headers: {
         Authorization: `Bearer ${token}`,
         "Accept-Language": locale
-      }
+      },
+      signal: controller.signal
     })
       .then(async (response) => {
         if (!response.ok) {
@@ -95,7 +102,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         setUser((await response.json()) as SessionUser);
       })
-      .catch(() => setUser(null));
+      .catch(() => setUser(null))
+      .finally(() => {
+        window.clearTimeout(timeout);
+        setAuthChecked(true);
+      });
   }, [locale]);
 
   useEffect(() => {
@@ -127,9 +138,18 @@ export function AppShell({ children }: { children: ReactNode }) {
     router.push("/");
   }
 
+  const mobileLinks = [
+    { href: "/play", label: t("nav.play"), icon: Gamepad2 },
+    { href: "/daily", label: t("nav.daily"), icon: Home },
+    { href: user ? "/profile" : "/login", label: nav.profile, icon: UserRound }
+  ];
+
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
+        <div className="h-0.5 overflow-hidden bg-primary/15">
+          <div className="navbar-accent-line h-full w-1/3 bg-primary" />
+        </div>
         <div className="mx-auto flex min-h-16 w-full max-w-7xl flex-wrap items-center gap-2 px-3 py-2 sm:flex-nowrap sm:gap-3 sm:px-6 lg:px-8">
           <Link href="/" className="group flex shrink-0 items-center gap-2 font-semibold">
             <Image src="/favicon.svg" alt="SudokuMind" width={36} height={36} className="rounded-md shadow-sm shadow-primary/25 transition-transform group-hover:-translate-y-0.5" priority />
@@ -178,9 +198,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             </Button>
 
-            {user ? (
-              <div className="flex items-center gap-2">
-                <Link href="/profile" className="relative">
+            {!authChecked ? null : user ? (
+              <div className="relative flex items-center gap-2">
+                <button type="button" className="relative" onClick={() => setProfileOpen((value) => !value)} aria-label={nav.profile}>
                   <Avatar className="h-9 w-9 border">
                     <AvatarImage src={user.avatarUrl ?? undefined} />
                     <AvatarFallback>{initials(user.fullName ?? user.email)}</AvatarFallback>
@@ -188,10 +208,23 @@ export function AppShell({ children }: { children: ReactNode }) {
                   {user.role === "PRO" ? (
                     <Badge className="absolute -bottom-2 -end-2 px-1 py-0 text-[10px]">{nav.proBadge}</Badge>
                   ) : null}
-                </Link>
-                <Button variant="ghost" size="icon" aria-label={t("nav.logout")} onClick={signOut}>
-                  <LogOut className="h-4 w-4" />
-                </Button>
+                </button>
+                {profileOpen ? (
+                  <div className="absolute end-0 top-11 z-50 w-48 overflow-hidden rounded-lg border bg-card p-1 text-sm shadow-soft">
+                    <Link href="/profile" className="flex items-center gap-2 rounded-md px-3 py-2 hover:bg-muted" onClick={() => setProfileOpen(false)}>
+                      <UserRound className="h-4 w-4" />
+                      {nav.profile}
+                    </Link>
+                    <Link href="/settings" className="flex items-center gap-2 rounded-md px-3 py-2 hover:bg-muted" onClick={() => setProfileOpen(false)}>
+                      <Settings className="h-4 w-4" />
+                      {nav.settings}
+                    </Link>
+                    <button type="button" className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left hover:bg-muted" onClick={signOut}>
+                      <LogOut className="h-4 w-4" />
+                      {t("nav.logout")}
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="flex items-center gap-1">
@@ -209,15 +242,24 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-      <nav className="sticky top-16 z-30 flex gap-1 overflow-x-auto border-b bg-background/90 px-3 py-2 backdrop-blur lg:hidden">
-        {links.map((link) => (
-          <Button key={link.href} variant={pathname === link.href ? "secondary" : "ghost"} size="sm" asChild className="shrink-0">
-            <Link href={link.href}>{link.label}</Link>
-          </Button>
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-3 border-t bg-background/95 px-2 py-1.5 backdrop-blur lg:hidden">
+        {mobileLinks.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className={[
+              "flex flex-col items-center justify-center gap-0.5 rounded-md py-1.5 text-xs font-medium",
+              pathname === link.href ? "bg-primary/12 text-primary" : "text-muted-foreground"
+            ].join(" ")}
+          >
+            <link.icon className="h-4 w-4" />
+            {link.label}
+          </Link>
         ))}
       </nav>
       <AnimatePresence mode="wait">
         <motion.main
+          className="pb-20 lg:pb-0"
           key={pathname}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}

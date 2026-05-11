@@ -1,10 +1,7 @@
 package com.sudokumind.backend.user.controller;
 
 import com.sudokumind.backend.common.util.CurrentUser;
-import com.sudokumind.backend.user.dto.DashboardResponse;
-import com.sudokumind.backend.user.dto.PublicUserResponse;
-import com.sudokumind.backend.user.dto.UpdateProfileRequest;
-import com.sudokumind.backend.user.dto.UserResponse;
+import com.sudokumind.backend.user.dto.*;
 import com.sudokumind.backend.user.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +26,11 @@ public class UserController {
     @GetMapping("/me/dashboard")
     public DashboardResponse dashboard() {
         return userService.dashboard(CurrentUser.id());
+    }
+
+    @GetMapping("/me/daily-goals")
+    public DailyGoalsResponse dailyGoals() {
+        return userService.dailyGoals(CurrentUser.id());
     }
 
     @PutMapping("/me")

@@ -23,6 +23,11 @@ public class GameController {
         return gameService.create(CurrentUser.id(), request);
     }
 
+    @PostMapping("/new")
+    public GameSessionResponse createNew(@Valid @RequestBody CreateGameRequest request) {
+        return gameService.create(CurrentUser.id(), request);
+    }
+
     @GetMapping("/{id}")
     public GameSessionResponse get(@PathVariable UUID id) {
         return gameService.get(CurrentUser.id(), id);

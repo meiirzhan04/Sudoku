@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -9,8 +9,13 @@ import {
   BarChart3,
   Brain,
   CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  CircleGauge,
+  Cloud,
   Flame,
   Medal,
+  MessageSquareQuote,
   Shield,
   Sparkles,
   Swords,
@@ -34,12 +39,15 @@ import {
 import { apiClient, hasAuthToken } from "@/lib/api-client";
 import type { Locale } from "@/lib/i18n/messages";
 import { formatSeconds } from "@/lib/utils";
+import { generateSudoku, relatedCell, type Board } from "@/lib/sudoku";
+import { useToast } from "@/components/ui/toast";
 
 type ContinueGame = {
+  id?: string;
   difficulty?: string;
-  elapsed_seconds?: number;
+  elapsedSeconds?: number;
   mistakes?: number;
-  entries?: number[][];
+  filledCells?: number;
   puzzle?: number[][];
   completed?: boolean;
 };
@@ -67,6 +75,7 @@ type DashboardResponse = {
 };
 
 type ActiveGameResponse = {
+  id: string;
   difficulty: string;
   elapsedSeconds: number;
   mistakes: number;
@@ -80,6 +89,45 @@ type DailyStatusResponse = {
   mistakes?: number;
   accuracy?: number;
   rank: number;
+};
+
+type DailyGoal = {
+  id: string;
+  title: string;
+  xp: number;
+  completed: boolean;
+};
+
+type DailyGoalsResponse = {
+  goals: DailyGoal[];
+};
+
+type GlobalStatsResponse = {
+  players: number;
+  gamesToday: number;
+  online: number;
+};
+
+type ActiveCity = {
+  flag: string;
+  city: string;
+  count: number;
+};
+
+type ActiveCitiesResponse = {
+  cities: ActiveCity[];
+};
+
+type DailyLeaderboardRow = {
+  rank: number;
+  username: string;
+  city: string | null;
+  timeSeconds: number;
+  mistakes: number;
+};
+
+type DailyChallengeInfo = {
+  difficulty?: string;
 };
 
 const dashboardCopy: Record<Locale, {
@@ -412,20 +460,51 @@ export default function HomePage() {
   const { locale } = useLanguage();
   const c = dashboardCopy[locale];
   const [isAuthed, setIsAuthed] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [milestone, setMilestone] = useState<number>();
 
   useEffect(() => {
-    setIsAuthed(hasAuthToken());
-    function refreshAuth() {
-      setIsAuthed(hasAuthToken());
+    async function refreshAuth() {
+      const token = window.localStorage.getItem("sudokumind-access-token");
+      if (!token) {
+        setIsAuthed(false);
+        setAuthChecked(true);
+        return;
+      }
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 1800);
+      try {
+        const response = await fetch("/api/users/me", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Accept-Language": locale
+          },
+          signal: controller.signal
+        });
+        if (!response.ok) {
+          window.localStorage.removeItem("sudokumind-access-token");
+          window.localStorage.removeItem("sudokumind-refresh-token");
+          document.cookie = "sm_access_token=; path=/; max-age=0; SameSite=Lax";
+          setIsAuthed(false);
+          return;
+        }
+        const user = await response.json();
+        setIsAuthed(Boolean(user?.id || user?.email));
+      } catch {
+        setIsAuthed(false);
+      } finally {
+        window.clearTimeout(timeout);
+        setAuthChecked(true);
+      }
     }
+    void refreshAuth();
     window.addEventListener("storage", refreshAuth);
     window.addEventListener("sudokumind-auth-updated", refreshAuth);
     return () => {
       window.removeEventListener("storage", refreshAuth);
       window.removeEventListener("sudokumind-auth-updated", refreshAuth);
     };
-  }, []);
+  }, [locale]);
 
   const dashboardQuery = useQuery({
     queryKey: ["dashboard"],
@@ -454,6 +533,35 @@ export default function HomePage() {
     queryFn: async () => (await apiClient.get<DailyStatusResponse>("/daily/today/status")).data
   });
 
+  const dailyGoalsQuery = useQuery({
+    queryKey: ["daily-goals"],
+    enabled: isAuthed,
+    queryFn: async () => (await apiClient.get<DailyGoalsResponse>("/users/me/daily-goals")).data
+  });
+
+  const globalStatsQuery = useQuery({
+    queryKey: ["global-stats"],
+    queryFn: async () => (await apiClient.get<GlobalStatsResponse>("/stats/global")).data,
+    refetchInterval: 30000
+  });
+
+  const activeCitiesQuery = useQuery({
+    queryKey: ["active-cities"],
+    queryFn: async () => (await apiClient.get<ActiveCitiesResponse>("/stats/cities/active")).data,
+    refetchInterval: 60000
+  });
+
+  const leaderboardQuery = useQuery({
+    queryKey: ["daily-leaderboard-home"],
+    queryFn: async () => (await apiClient.get<DailyLeaderboardRow[]>("/leaderboard/daily?limit=5")).data,
+    refetchInterval: 60000
+  });
+
+  const dailyInfoQuery = useQuery({
+    queryKey: ["daily-info"],
+    queryFn: async () => (await apiClient.get<DailyChallengeInfo>("/daily/today")).data
+  });
+
   const dashboard = dashboardQuery.data;
   const habit = useMemo<HabitState>(() => {
     if (!dashboard) return emptyHabitState();
@@ -474,11 +582,13 @@ export default function HomePage() {
 
   const continueGame = useMemo<ContinueGame | null>(() => {
     if (!activeGameQuery.data) return null;
+    const filledCells = activeGameQuery.data.currentBoard.flat().filter(Boolean).length;
     return {
+      id: activeGameQuery.data.id,
       difficulty: activeGameQuery.data.difficulty.toLowerCase(),
-      elapsed_seconds: activeGameQuery.data.elapsedSeconds,
+      elapsedSeconds: activeGameQuery.data.elapsedSeconds,
       mistakes: activeGameQuery.data.mistakes,
-      entries: activeGameQuery.data.currentBoard,
+      filledCells,
       completed: activeGameQuery.data.status === "COMPLETED"
     };
   }, [activeGameQuery.data]);
@@ -487,8 +597,9 @@ export default function HomePage() {
   const week = useMemo(() => weeklyProgress(habit), [habit]);
   const completedToday = dailyStatusQuery.data?.completed ?? dashboard?.dailyGoalCompleted ?? false;
   const recommendation = useMemo(() => smartRecommendation(habit, c), [habit, c]);
-  const dailyGoalDone = completedToday;
-  const loading = isAuthed && (dashboardQuery.isLoading || activeGameQuery.isLoading || dailyStatusQuery.isLoading);
+  const dailyGoals = dailyGoalsQuery.data?.goals;
+  const dailyGoalDone = dailyGoals?.some((goal) => goal.completed) ?? completedToday;
+  const loading = authChecked && isAuthed && (dashboardQuery.isLoading || activeGameQuery.isLoading || dailyStatusQuery.isLoading);
   const username = dashboard?.fullName || dashboard?.username || "there";
   const displayedRank = !dashboard?.currentRank || dashboard.currentRank.toLowerCase() === "starter" ? c.starterRank : dashboard.currentRank;
 
@@ -528,13 +639,23 @@ export default function HomePage() {
   }
 
   if (!isAuthed) {
-    return <GuestDashboard c={c} />;
+    return (
+      <GuestDashboard
+        c={c}
+        stats={globalStatsQuery.data}
+        cities={activeCitiesQuery.data?.cities ?? []}
+        leaderboard={leaderboardQuery.data ?? []}
+        dailyInfo={dailyInfoQuery.data}
+      />
+    );
   }
 
   return (
-    <div className="relative overflow-hidden">
+    <div className="relative isolate overflow-hidden">
       <div className="premium-grid pointer-events-none absolute inset-x-0 top-0 h-[520px]" />
       <div className="page-shell relative space-y-6">
+        <ActiveCitiesStrip cities={activeCitiesQuery.data?.cities ?? []} />
+
         <section className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div>
             <Badge variant="outline" className="mb-3 gap-2">
@@ -574,11 +695,15 @@ export default function HomePage() {
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="grid gap-4 md:grid-cols-2">
-            {continueGame ? <ContinueGameCard game={continueGame} c={c} /> : null}
+            {continueGame ? <ContinueGameCard game={continueGame} c={c} /> : <StartNewGameCard c={c} />}
             <ActionCard
               icon={CalendarDays}
               title={c.todaysChallenge}
-              text={completedToday ? c.completedDaily : c.dailyText}
+              text={
+                dailyStatusQuery.data?.completed
+                  ? `${c.completedDaily} · ${formatSeconds(dailyStatusQuery.data.timeSeconds ?? 0)} · ${dailyStatusQuery.data.mistakes ?? 0} ${c.mistakes.toLowerCase()} · #${dailyStatusQuery.data.rank}`
+                  : c.dailyText
+              }
               href="/daily"
               cta={completedToday ? c.viewLeaderboard : c.playDaily}
               glow={!completedToday}
@@ -588,7 +713,7 @@ export default function HomePage() {
             <ActionCard icon={Wand2} title={c.aiTitle} text={c.aiText} href="/play" cta={c.explainCell} />
             <ActionCard icon={Sparkles} title={c.themesTitle} text={c.themesText} href="/pro" cta={c.explorePro} />
           </div>
-          <DailyGoalCard done={dailyGoalDone} habit={habit} c={c} />
+          <DailyGoalCard done={dailyGoalDone} goals={dailyGoals} habit={habit} c={c} />
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -602,13 +727,27 @@ export default function HomePage() {
   );
 }
 
-function GuestDashboard({ c }: { c: typeof dashboardCopy.en }) {
+function GuestDashboard({
+  c,
+  stats,
+  cities,
+  leaderboard,
+  dailyInfo
+}: {
+  c: typeof dashboardCopy.en;
+  stats?: GlobalStatsResponse;
+  cities: ActiveCity[];
+  leaderboard: DailyLeaderboardRow[];
+  dailyInfo?: DailyChallengeInfo;
+}) {
   return (
     <div className="relative overflow-hidden">
-      <div className="premium-grid pointer-events-none absolute inset-x-0 top-0 h-[520px]" />
-      <div className="page-shell relative space-y-8">
-        <section className="grid min-h-[calc(100vh-12rem)] items-center gap-8 lg:grid-cols-[minmax(0,1fr)_420px]">
-          <div className="space-y-6">
+      <SudokuAmbientBackground />
+      <div className="page-shell relative z-10 space-y-8 pt-6 sm:pt-8">
+        <ActiveCitiesStrip cities={cities} />
+
+        <section className="grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_430px]">
+          <div className="space-y-5">
             <Badge variant="outline" className="gap-2">
               <Brain className="h-3.5 w-3.5 text-primary" />
               SudokuMind
@@ -634,24 +773,377 @@ function GuestDashboard({ c }: { c: typeof dashboardCopy.en }) {
                 <Link href="/register">{c.register}</Link>
               </Button>
             </div>
+            <LiveStats stats={stats} />
           </div>
 
-          <Card className="overflow-hidden bg-card/90 shadow-soft backdrop-blur">
-            <CardHeader>
-              <CardTitle>{c.unlockTitle}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {c.unlocks.map((item) => (
-                <div key={item} className="flex items-center gap-3 rounded-lg border bg-background/60 p-3 text-sm">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  {item}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <MiniPlayableBoard />
         </section>
+
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
+          <UnlockCards c={c} />
+          <DailyCountdownCard dailyInfo={dailyInfo} />
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
+          <DailyTopPlayers rows={leaderboard} />
+          <AchievementsPreview />
+        </section>
+
+        <Testimonials />
+
+        <footer className="flex flex-col justify-between gap-3 border-t py-6 text-sm text-muted-foreground sm:flex-row sm:items-center">
+          <div className="flex gap-4">
+            <Link href="#" className="hover:text-foreground">О нас</Link>
+            <Link href="#" className="hover:text-foreground">Условия</Link>
+            <Link href="#" className="hover:text-foreground">Политика</Link>
+          </div>
+          <span className="font-mono">v1.0.0</span>
+        </footer>
       </div>
     </div>
+  );
+}
+
+function SudokuAmbientBackground() {
+  const digits = ["1", "7", "4", "9", "2", "6", "8", "3", "5", "4", "9", "1"];
+  return (
+    <div className="sudoku-ambient pointer-events-none absolute inset-0 -z-10">
+      <div className="premium-grid absolute inset-0" />
+      <div className="absolute inset-0">
+        {digits.map((digit, index) => (
+          <span
+            key={`${digit}-${index}`}
+            className="ambient-number"
+            style={{
+              left: `${8 + (index % 6) * 16}%`,
+              top: `${10 + Math.floor(index / 6) * 34 + (index % 2) * 8}%`,
+              animationDelay: `${index * 620}ms`
+            }}
+          >
+            {digit}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LiveStats({ stats }: { stats?: GlobalStatsResponse }) {
+  const items = [
+    { label: "игроков", value: stats?.players ?? 0, icon: "🧠" },
+    { label: "игр сегодня", value: stats?.gamesToday ?? 0, icon: "⚡" },
+    { label: "онлайн", value: stats?.online ?? 0, icon: "🔥" }
+  ];
+  return (
+    <div className="grid gap-2 rounded-lg border bg-card/80 p-3 backdrop-blur sm:grid-cols-3">
+      {items.map((item) => (
+        <div key={item.label} className="flex items-center gap-2 text-sm">
+          <span>{item.icon}</span>
+          <span className="font-mono text-lg font-semibold"><AnimatedNumber value={item.value} /></span>
+          <span className="text-muted-foreground">{item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AnimatedNumber({ value }: { value: number }) {
+  const [display, setDisplay] = useState(value);
+  const displayRef = useRef(value);
+
+  useEffect(() => {
+    const startValue = displayRef.current;
+    const diff = value - startValue;
+    const start = performance.now();
+    let frame = 0;
+
+    function tick(now: number) {
+      const progress = Math.min(1, (now - start) / 700);
+      const next = Math.round(startValue + diff * (1 - Math.pow(1 - progress, 3)));
+      displayRef.current = next;
+      setDisplay(next);
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    }
+
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+
+  return <>{display.toLocaleString("ru-RU")}</>;
+}
+
+function ActiveCitiesStrip({ cities }: { cities: ActiveCity[] }) {
+  if (cities.length === 0) return null;
+  return (
+    <div className="-mx-4 overflow-x-auto border-y bg-card/55 px-4 py-2 text-sm backdrop-blur sm:mx-0 sm:rounded-lg sm:border">
+      <div className="flex min-w-max items-center gap-3">
+        <span className="font-medium text-muted-foreground">Сейчас играют:</span>
+        {cities.map((city) => (
+          <span key={city.city} className="whitespace-nowrap">
+            {city.flag} {city.city} ({city.count})
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MiniPlayableBoard() {
+  const { toast } = useToast();
+  const [seed, setSeed] = useState("guest-home");
+  const puzzle = useMemo(() => generateSudoku("easy", seed), [seed]);
+  const [entries, setEntries] = useState<Board>(() => puzzle.puzzle.map((row) => [...row]));
+  const [selected, setSelected] = useState<[number, number] | null>(null);
+  const [mistakes, setMistakes] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [winShown, setWinShown] = useState(false);
+
+  useEffect(() => {
+    setEntries(puzzle.puzzle.map((row) => [...row]));
+    setSelected(null);
+    setMistakes(0);
+    setElapsed(0);
+    setWinShown(false);
+  }, [puzzle]);
+
+  useEffect(() => {
+    if (winShown) return;
+    const timer = window.setInterval(() => setElapsed((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [winShown]);
+
+  const solved = entries.every((row, rowIndex) => row.every((value, colIndex) => value === puzzle.solution[rowIndex][colIndex]));
+  const given = useMemo(() => puzzle.puzzle.map((row) => row.map(Boolean)), [puzzle.puzzle]);
+
+  useEffect(() => {
+    if (!solved || winShown) return;
+    setWinShown(true);
+    toast({
+      title: `Отличная игра! ⏱ ${formatSeconds(elapsed)} · ${mistakes} ошибок · Зарегистрируйся чтобы войти в топ`,
+      variant: "success"
+    });
+  }, [elapsed, mistakes, solved, toast, winShown]);
+
+  function setDigit(digit: number) {
+    if (!selected || solved) return;
+    const [row, col] = selected;
+    if (given[row][col]) return;
+    setEntries((current) => {
+      const next = current.map((item) => [...item]) as Board;
+      next[row][col] = digit;
+      return next;
+    });
+    if (puzzle.solution[row][col] !== digit) {
+      setMistakes((value) => value + 1);
+    }
+  }
+
+  return (
+    <Card className="overflow-hidden bg-card/90 shadow-soft backdrop-blur">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between gap-3 text-lg">
+          Мини-доска
+          <span className="font-mono text-sm text-muted-foreground">{formatSeconds(elapsed)}</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="mx-auto grid w-full max-w-[360px] grid-cols-9 overflow-hidden rounded-md border">
+          {entries.map((row, rowIndex) =>
+            row.map((value, colIndex) => {
+              const isSelected = selected?.[0] === rowIndex && selected?.[1] === colIndex;
+              const isRelated = selected ? relatedCell(selected, [rowIndex, colIndex]) : false;
+              return (
+                <button
+                  key={`${rowIndex}-${colIndex}`}
+                  type="button"
+                  onClick={() => setSelected([rowIndex, colIndex])}
+                  className={[
+                    "aspect-square border bg-background/85 text-sm font-semibold transition-colors sm:text-base",
+                    given[rowIndex][colIndex] ? "text-foreground" : "text-primary",
+                    isRelated ? "bg-accent/70" : "",
+                    isSelected ? "bg-primary text-primary-foreground" : ""
+                  ].join(" ")}
+                  style={{
+                    borderRightWidth: colIndex === 2 || colIndex === 5 ? 2 : 1,
+                    borderBottomWidth: rowIndex === 2 || rowIndex === 5 ? 2 : 1
+                  }}
+                >
+                  {value || ""}
+                </button>
+              );
+            })
+          )}
+        </div>
+        <div className="grid grid-cols-9 gap-1">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => (
+            <Button key={digit} variant="secondary" className="aspect-square px-0" onClick={() => setDigit(digit)}>
+              {digit}
+            </Button>
+          ))}
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Button variant="outline" onClick={() => toast({ title: "Войди чтобы сохранить" })}>Сохранить</Button>
+          <Button onClick={() => setSeed(`guest-${Date.now()}`)}>Сыграть ещё</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function UnlockCards({ c }: { c: typeof dashboardCopy.en }) {
+  const icons = [BarChart3, Flame, Cloud, Trophy];
+  const descriptions = [
+    "Статистика партий, точность и лучшие времена собираются в одном месте.",
+    "Ежедневный ритм, XP и прогресс уровня после каждой игры.",
+    "Продолжай с любого устройства и не теряй незавершённые игры.",
+    "Профиль, рейтинг города и достижения открываются после входа."
+  ];
+  return (
+    <section>
+      <h2 className="mb-4 text-2xl font-semibold">{c.unlockTitle}</h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {c.unlocks.map((item, index) => {
+          const Icon = icons[index] ?? Sparkles;
+          return (
+            <Card key={item} className="bg-card/85 backdrop-blur">
+              <CardContent className="flex gap-3 p-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <Icon className={`h-5 w-5 ti ${["ti-chart-bar", "ti-flame", "ti-cloud", "ti-trophy"][index] ?? ""}`} />
+                </div>
+                <div>
+                  <div className="font-semibold">{item}</div>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{descriptions[index]}</p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function DailyCountdownCard({ dailyInfo }: { dailyInfo?: DailyChallengeInfo }) {
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  useEffect(() => {
+    function updateCountdown() {
+      const now = new Date();
+      const next = new Date(now);
+      next.setHours(24, 0, 0, 0);
+      setSecondsLeft(Math.max(0, Math.floor((next.getTime() - now.getTime()) / 1000)));
+    }
+    updateCountdown();
+    const timer = window.setInterval(updateCountdown, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return (
+    <Card className="bg-card/85 backdrop-blur">
+      <CardContent className="space-y-3 p-5">
+        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <CalendarDays className="h-5 w-5" />
+        </div>
+        <div>
+          <div className="text-lg font-semibold">Новая головоломка через {formatCountdown(secondsLeft)}</div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Сегодня: {formatDifficulty(dailyInfo?.difficulty, dashboardCopy.ru)}. Завтрашняя сложность появится после генерации.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DailyTopPlayers({ rows }: { rows: DailyLeaderboardRow[] }) {
+  return (
+    <Card className="bg-card/85 backdrop-blur">
+      <CardHeader>
+        <CardTitle>Топ игроков дня</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-[48px_minmax(0,1fr)_120px_80px] gap-3 text-xs font-medium uppercase text-muted-foreground">
+          <span>#</span>
+          <span>Игрок · Город</span>
+          <span>Время</span>
+          <span>Ошибки</span>
+        </div>
+        {rows.length === 0 ? (
+          <div className="rounded-lg border bg-background/60 p-4 text-sm text-muted-foreground">Сегодня ещё нет результатов.</div>
+        ) : rows.map((row) => (
+          <motion.div
+            key={`${row.rank}-${row.username}-${row.timeSeconds}`}
+            initial={{ opacity: 0, x: 18 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="grid grid-cols-[48px_minmax(0,1fr)_120px_80px] gap-3 rounded-lg border bg-background/60 p-3 text-sm"
+          >
+            <span className="font-mono">#{row.rank}</span>
+            <span className="min-w-0 truncate">{row.username} · {row.city ?? "Мир"}</span>
+            <span className="font-mono">{formatSeconds(row.timeSeconds)}</span>
+            <span>{row.mistakes}</span>
+          </motion.div>
+        ))}
+        <Button variant="outline" className="w-full" asChild>
+          <Link href="/leaderboard">
+            Смотреть полный рейтинг
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AchievementsPreview() {
+  const { toast } = useToast();
+  const items = [
+    { icon: "🏆", title: "Решить 100 головоломок" },
+    { icon: "🔥", title: "Стрик 30 дней" },
+    { icon: "⚡", title: "Решить за 3 минуты" },
+    { icon: "🎯", title: "Неделя без ошибок" },
+    { icon: "💎", title: "Войти в топ-10" },
+    { icon: "👑", title: "Победить в битве" }
+  ];
+  return (
+    <Card className="bg-card/85 backdrop-blur">
+      <CardHeader>
+        <CardTitle>Достижения</CardTitle>
+      </CardHeader>
+      <CardContent className="grid grid-cols-3 gap-3">
+        {items.map((item) => (
+          <button
+            key={item.title}
+            type="button"
+            title={item.title}
+            onClick={() => toast({ title: "Зарегистрируйся чтобы открыть достижения" })}
+            className="group flex aspect-square items-center justify-center rounded-lg border bg-background/60 text-3xl blur-[1px] transition hover:blur-0"
+          >
+            {item.icon}
+          </button>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Testimonials() {
+  const quotes = [
+    "Наконец-то судоку, где прогресс ощущается каждый день.",
+    "Мини-доска на главной затянула быстрее, чем я ожидал.",
+    "Стрики и рейтинг города добавили приятный азарт."
+  ];
+  return (
+    <section className="grid gap-3 md:grid-cols-3">
+      {quotes.map((quote) => (
+        <Card key={quote} className="bg-card/85 backdrop-blur">
+          <CardContent className="space-y-3 p-4">
+            <div className="flex items-center gap-2 text-primary">
+              <MessageSquareQuote className="h-4 w-4" />
+              <span>★★★★★</span>
+            </div>
+            <p className="text-sm leading-6 text-muted-foreground">“{quote}”</p>
+          </CardContent>
+        </Card>
+      ))}
+    </section>
   );
 }
 
@@ -776,7 +1268,7 @@ function LevelCard({ habit, progress, c }: { habit: HabitState; progress: Return
 }
 
 function ContinueGameCard({ game, c }: { game: ContinueGame | null; c: typeof dashboardCopy.en }) {
-  const progress = game?.entries ? Math.round((game.entries.flat().filter(Boolean).length / 81) * 100) : 0;
+  const progress = game?.filledCells ? Math.round((game.filledCells / 81) * 100) : 0;
   return (
     <Card className="bg-card/90 shadow-soft backdrop-blur">
       <CardHeader>
@@ -787,14 +1279,14 @@ function ContinueGameCard({ game, c }: { game: ContinueGame | null; c: typeof da
           <>
             <div className="grid grid-cols-3 gap-2">
               <MiniStat label={c.difficulty} value={formatDifficulty(game.difficulty, c)} />
-              <MiniStat label={c.time} value={formatSeconds(game.elapsed_seconds ?? 0)} />
+              <MiniStat label={c.time} value={formatSeconds(game.elapsedSeconds ?? 0)} />
               <MiniStat label={c.mistakes} value={game.mistakes ?? 0} />
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-muted">
               <div className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
             </div>
             <Button className="w-full" asChild>
-              <Link href="/play">{c.continue}</Link>
+              <Link href={game.id ? `/play?gameId=${game.id}` : "/play"}>{c.continue}</Link>
             </Button>
           </>
         ) : (
@@ -805,6 +1297,22 @@ function ContinueGameCard({ game, c }: { game: ContinueGame | null; c: typeof da
             </Button>
           </>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StartNewGameCard({ c }: { c: typeof dashboardCopy.en }) {
+  return (
+    <Card className="bg-card/90 shadow-soft backdrop-blur">
+      <CardHeader>
+        <CardTitle>{c.startNewGame}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">{c.noGame}</p>
+        <Button className="w-full" asChild>
+          <Link href="/play">{c.startNewGame}</Link>
+        </Button>
       </CardContent>
     </Card>
   );
@@ -845,7 +1353,20 @@ function ActionCard({
   );
 }
 
-function DailyGoalCard({ done, habit, c }: { done: boolean; habit: HabitState; c: typeof dashboardCopy.en }) {
+function DailyGoalCard({
+  done,
+  goals,
+  habit,
+  c
+}: {
+  done: boolean;
+  goals?: DailyGoal[];
+  habit: HabitState;
+  c: typeof dashboardCopy.en;
+}) {
+  const items = goals?.length
+    ? goals
+    : c.goals.map((goal, index) => ({ id: goal, title: goal, xp: index === 3 ? 150 : 50, completed: done && index === 0 }));
   return (
     <Card className="bg-card/90 shadow-soft backdrop-blur">
       <CardHeader>
@@ -855,10 +1376,13 @@ function DailyGoalCard({ done, habit, c }: { done: boolean; habit: HabitState; c
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {c.goals.map((goal, index) => (
-          <div key={goal} className="flex items-center justify-between rounded-lg border bg-background/60 p-3">
-            <span className="text-sm">{goal}</span>
-            <Badge variant={done && index === 0 ? "default" : "outline"}>{done && index === 0 ? c.done : `+${index === 3 ? 150 : 50} XP`}</Badge>
+        {items.map((goal) => (
+          <div key={goal.id} className="flex items-center justify-between gap-3 rounded-lg border bg-background/60 p-3">
+            <span className={["text-sm", goal.completed ? "text-muted-foreground line-through" : ""].join(" ")}>{goal.title}</span>
+            <div className="flex items-center gap-2">
+              {goal.completed ? <CheckCircle2 className="daily-goal-check h-5 w-5 text-emerald-400" /> : null}
+              <Badge variant={goal.completed ? "default" : "outline"}>{goal.completed ? "Получено" : `+${goal.xp} XP`}</Badge>
+            </div>
           </div>
         ))}
         <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 text-sm text-muted-foreground">
@@ -991,4 +1515,11 @@ function formatDifficulty(difficulty: string | undefined, c: typeof dashboardCop
   if (value === "hard") return c === dashboardCopy.ru ? "Сложная" : c === dashboardCopy.kk ? "Қиын" : "Hard";
   if (value === "expert") return c === dashboardCopy.ru ? "Эксперт" : c === dashboardCopy.kk ? "Эксперт" : "Expert";
   return difficulty ?? (c === dashboardCopy.ru ? "Средняя" : c === dashboardCopy.kk ? "Орташа" : "Medium");
+}
+
+function formatCountdown(seconds: number) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const rest = seconds % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
 }

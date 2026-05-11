@@ -33,11 +33,19 @@ type BackendLeaderboardRow = {
   isPro: boolean;
 };
 
+type DailyStatus = {
+  completed: boolean;
+  timeSeconds?: number;
+  mistakes?: number;
+  rank: number;
+};
+
 export function DailyClient() {
   const { t } = useLanguage();
   const [city, setCity] = useState("");
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
   const [challengeId, setChallengeId] = useState<string>();
+  const [status, setStatus] = useState<DailyStatus | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [habit, setHabit] = useState<HabitState>(() => emptyHabitState());
 
@@ -57,6 +65,15 @@ export function DailyClient() {
     fetch(`/api/daily/today`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data: BackendDailyChallenge | null) => setChallengeId(data?.id))
+      .catch(() => undefined);
+
+    const token = window.localStorage.getItem("sudokumind-access-token");
+    if (!token) return;
+    fetch("/api/daily/today/status", {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: DailyStatus | null) => setStatus(data))
       .catch(() => undefined);
   }, []);
 
@@ -91,7 +108,7 @@ export function DailyClient() {
   const countdown = useMemo(() => {
     const next = new Date(now);
     next.setHours(24, 0, 0, 0);
-    return formatSeconds(Math.max(0, Math.floor((next.getTime() - now.getTime()) / 1000)));
+    return formatCountdown(Math.max(0, Math.floor((next.getTime() - now.getTime()) / 1000)));
   }, [now]);
 
   function copyStreak() {
@@ -111,8 +128,38 @@ export function DailyClient() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <SudokuGame daily dailyChallengeId={challengeId} />
-        <Card>
+        {status?.completed ? (
+          <Card className="border-primary/30 shadow-soft">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BadgeCheck className="h-5 w-5 text-primary" />
+                Пройдено
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border bg-background/60 p-4">
+                  <div className="text-sm text-muted-foreground">Время</div>
+                  <div className="font-mono text-xl font-semibold">{formatSeconds(status.timeSeconds ?? 0)}</div>
+                </div>
+                <div className="rounded-lg border bg-background/60 p-4">
+                  <div className="text-sm text-muted-foreground">Ошибки</div>
+                  <div className="font-mono text-xl font-semibold">{status.mistakes ?? 0}</div>
+                </div>
+                <div className="rounded-lg border bg-background/60 p-4">
+                  <div className="text-sm text-muted-foreground">Рейтинг</div>
+                  <div className="font-mono text-xl font-semibold">#{status.rank}</div>
+                </div>
+              </div>
+              <Button asChild>
+                <a href="#daily-leaderboard">Смотреть рейтинг →</a>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <SudokuGame daily dailyChallengeId={challengeId} />
+        )}
+        <Card id="daily-leaderboard">
           <CardHeader>
             <CardTitle>{t("daily.leaderboard")}</CardTitle>
           </CardHeader>
@@ -152,4 +199,11 @@ export function DailyClient() {
       </div>
     </div>
   );
+}
+
+function formatCountdown(seconds: number) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const rest = seconds % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
 }
