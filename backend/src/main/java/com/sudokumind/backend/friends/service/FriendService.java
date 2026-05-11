@@ -16,6 +16,7 @@ import com.sudokumind.backend.user.service.UserService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -81,8 +82,13 @@ public class FriendService {
     }
 
     public List<FriendResponse> friends(UUID userId) {
+        Instant onlineSince = Instant.now().minusSeconds(300);
         return friendRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .map(friend -> new FriendResponse(publicUser(friend.getFriend()), false, friend.getCreatedAt()))
+                .map(friend -> new FriendResponse(
+                        publicUser(friend.getFriend()),
+                        friend.getFriend().getUpdatedAt().isAfter(onlineSince),
+                        friend.getCreatedAt()
+                ))
                 .toList();
     }
 

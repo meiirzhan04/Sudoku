@@ -9,8 +9,13 @@ public record RoomResponse(
         UUID id,
         String roomCode,
         RoomStatus status,
+        UUID hostUserId,
         UUID winnerUserId,
         int[][] puzzle,
+        int[][] solution,
+        int[][] currentBoard,
+        String difficulty,
+        String mode,
         List<RoomPlayerResponse> players
 ) {
 }

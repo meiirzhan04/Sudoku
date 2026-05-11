@@ -8,6 +8,7 @@ import com.sudokumind.backend.daily.entity.DailyResult;
 import com.sudokumind.backend.daily.repository.DailyResultRepository;
 import com.sudokumind.backend.friends.repository.FriendRepository;
 import com.sudokumind.backend.game.repository.GameSessionRepository;
+import com.sudokumind.backend.leaderboard.GlobalLeaderboardEntry;
 import com.sudokumind.backend.user.dto.*;
 import com.sudokumind.backend.user.entity.User;
 import com.sudokumind.backend.user.repository.UserRepository;
@@ -102,8 +103,14 @@ public class UserService {
         }
 
         int currentStreak = currentStreak(completedDates);
+        if (user.getStreakOverride() != null) {
+            currentStreak = Math.max(0, user.getStreakOverride());
+        }
         int longestStreak = longestStreak(completedDates);
         int xp = (int) (stats.wins() * 50 + dailyResults.size() * 100L + currentStreak * 20L);
+        if (user.getXpOverride() != null) {
+            xp = Math.max(0, user.getXpOverride());
+        }
         int level = Math.max(1, xp / 1000 + 1);
         int levelStart = (level - 1) * 1000;
         int xpProgress = xp - levelStart;
@@ -133,6 +140,47 @@ public class UserService {
                 completedDates.contains(LocalDate.now()),
                 rank
         );
+    }
+
+    public List<GlobalLeaderboardEntry> leaderboard(int limit) {
+        java.util.concurrent.atomic.AtomicInteger rank = new java.util.concurrent.atomic.AtomicInteger(1);
+        return userRepository.findAll().stream()
+                .map(user -> {
+                    UserStatsDto stats = stats(user.getId());
+                    return new GlobalLeaderboardEntry(
+                            0,
+                            user.getId(),
+                            user.getUsername(),
+                            user.getCity(),
+                            user.getAvatarUrl(),
+                            stats.wins(),
+                            stats.bestTimeSeconds(),
+                            stats.averageAccuracy(),
+                            tier(stats.wins()),
+                            user.getRole() == UserRole.PRO
+                    );
+                })
+                .sorted((a, b) -> {
+                    int wins = Long.compare(b.completedGames(), a.completedGames());
+                    if (wins != 0) return wins;
+                    int aTime = a.bestTimeSeconds() == null ? Integer.MAX_VALUE : a.bestTimeSeconds();
+                    int bTime = b.bestTimeSeconds() == null ? Integer.MAX_VALUE : b.bestTimeSeconds();
+                    return Integer.compare(aTime, bTime);
+                })
+                .limit(Math.max(1, Math.min(limit, 100)))
+                .map(entry -> new GlobalLeaderboardEntry(
+                        rank.getAndIncrement(),
+                        entry.userId(),
+                        entry.username(),
+                        entry.city(),
+                        entry.avatarUrl(),
+                        entry.completedGames(),
+                        entry.bestTimeSeconds(),
+                        entry.averageAccuracy(),
+                        entry.tier(),
+                        entry.pro()
+                ))
+                .toList();
     }
 
     public DailyGoalsResponse dailyGoals(UUID userId) {
@@ -174,5 +222,13 @@ public class UserService {
             previous = date;
         }
         return longest;
+    }
+
+    private String tier(long wins) {
+        if (wins >= 100) return "Grandmaster";
+        if (wins >= 50) return "Diamond";
+        if (wins >= 20) return "Gold";
+        if (wins >= 5) return "Silver";
+        return "Starter";
     }
 }

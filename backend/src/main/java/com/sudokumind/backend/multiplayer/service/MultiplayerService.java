@@ -42,13 +42,21 @@ public class MultiplayerService {
 
     @Transactional
     public CreateRoomResponse createRoom(UUID userId) {
+        return createRoom(userId, Difficulty.MEDIUM, "CLASSIC");
+    }
+
+    @Transactional
+    public CreateRoomResponse createRoom(UUID userId, Difficulty difficulty, String mode) {
         User host = userService.require(userId);
-        var puzzle = sudokuEngine.generate(Difficulty.MEDIUM);
+        Difficulty selectedDifficulty = difficulty == null ? Difficulty.MEDIUM : difficulty;
+        var puzzle = sudokuEngine.generate(selectedDifficulty);
         MultiplayerRoom room = new MultiplayerRoom();
         room.setRoomCode(uniqueCode());
         room.setHostUser(host);
         room.setPuzzle(puzzle.puzzle());
         room.setSolution(puzzle.solution());
+        room.setDifficulty(selectedDifficulty);
+        room.setMode(mode == null || mode.isBlank() ? "CLASSIC" : mode);
         roomRepository.save(room);
         createPlayer(room, host);
         return new CreateRoomResponse(room.getId(), room.getRoomCode(), room.getStatus(), room.getPuzzle());
@@ -67,11 +75,20 @@ public class MultiplayerService {
             roomRepository.save(room);
             createPlayer(room, guest);
         }
-        return room(room.getId());
+        return room(room.getId(), userId);
     }
 
     public RoomResponse room(UUID roomId) {
+        return room(roomId, null);
+    }
+
+    public RoomResponse room(UUID roomId, UUID viewerId) {
         MultiplayerRoom room = require(roomId);
+        int[][] currentBoard = viewerId == null
+                ? room.getPuzzle()
+                : playerRepository.findByRoomIdAndUserId(roomId, viewerId)
+                .map(MultiplayerPlayer::getCurrentBoard)
+                .orElse(room.getPuzzle());
         List<RoomPlayerResponse> players = playerRepository.findByRoomId(roomId).stream()
                 .map(player -> new RoomPlayerResponse(
                         player.getUser().getId(),
@@ -84,7 +101,19 @@ public class MultiplayerService {
                         player.getFinishedAt()
                 ))
                 .toList();
-        return new RoomResponse(room.getId(), room.getRoomCode(), room.getStatus(), room.getWinnerUser() == null ? null : room.getWinnerUser().getId(), room.getPuzzle(), players);
+        return new RoomResponse(
+                room.getId(),
+                room.getRoomCode(),
+                room.getStatus(),
+                room.getHostUser().getId(),
+                room.getWinnerUser() == null ? null : room.getWinnerUser().getId(),
+                room.getPuzzle(),
+                room.getSolution(),
+                currentBoard,
+                room.getDifficulty().name(),
+                room.getMode(),
+                players
+        );
     }
 
     @Transactional
@@ -93,7 +122,7 @@ public class MultiplayerService {
         assertHost(userId, room);
         room.setStatus(RoomStatus.ACTIVE);
         room.setStartedAt(Instant.now());
-        return room(roomRepository.save(room).getId());
+        return room(roomRepository.save(room).getId(), userId);
     }
 
     @Transactional
@@ -102,7 +131,7 @@ public class MultiplayerService {
         if (!old.getHostUser().getId().equals(userId) && (old.getGuestUser() == null || !old.getGuestUser().getId().equals(userId))) {
             throw new ApiException(ErrorCode.ACCESS_DENIED);
         }
-        return room(createRoom(userId).roomId());
+        return room(createRoom(userId).roomId(), userId);
     }
 
     @Transactional
@@ -112,7 +141,7 @@ public class MultiplayerService {
             player.setConnected(false);
             playerRepository.save(player);
         });
-        return room(roomId);
+        return room(roomId, userId);
     }
 
     @Transactional
@@ -133,6 +162,9 @@ public class MultiplayerService {
             room.setWinnerUser(user);
             room.setFinishedAt(Instant.now());
             roomRepository.save(room);
+        }
+        if (sudokuEngine.matchesSolution(board, room.getSolution())) {
+            player.setFinishedAt(player.getFinishedAt() == null ? Instant.now() : player.getFinishedAt());
         }
         playerRepository.save(player);
         MultiplayerMove move = new MultiplayerMove();

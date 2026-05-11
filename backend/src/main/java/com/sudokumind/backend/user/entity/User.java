@@ -51,6 +51,9 @@ public class User {
     @Column(name = "is_email_verified", nullable = false)
     private boolean isEmailVerified = false;
 
+    private Integer xpOverride;
+    private Integer streakOverride;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private Instant createdAt;

@@ -2,6 +2,7 @@ package com.sudokumind.backend.stats;
 
 import com.sudokumind.backend.stats.dto.ActiveCitiesResponse;
 import com.sudokumind.backend.stats.dto.GlobalStatsResponse;
+import com.sudokumind.backend.stats.dto.OnlinePlayerResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,4 +25,10 @@ public class StatsController {
     public ActiveCitiesResponse activeCities() {
         return statsService.activeCities();
     }
+
+    @GetMapping("/players/online")
+    public List<OnlinePlayerResponse> onlinePlayers() {
+        return statsService.onlinePlayers();
+    }
 }
+import java.util.List;

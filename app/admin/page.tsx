@@ -1,0 +1,255 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { Shield, Search, Save, SlidersHorizontal, Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import { useToast } from "@/components/ui/toast";
+import { apiClient } from "@/lib/api-client";
+import { formatSeconds } from "@/lib/utils";
+
+type AdminUser = {
+  id: string;
+  fullName: string;
+  username: string;
+  email: string;
+  city?: string | null;
+  role: "USER" | "ADMIN" | "PRO";
+  emailVerified: boolean;
+  gamesPlayed: number;
+  wins: number;
+  bestTimeSeconds?: number | null;
+  averageAccuracy: number;
+  currentStreak: number;
+  xp: number;
+  xpOverride?: number | null;
+  streakOverride?: number | null;
+  updatedAt: string;
+};
+
+type Draft = {
+  fullName: string;
+  username: string;
+  city: string;
+  role: AdminUser["role"];
+  emailVerified: boolean;
+  xpOverride: string;
+  streakOverride: string;
+};
+
+export default function AdminPage() {
+  const { toast } = useToast();
+  const [query, setQuery] = useState("");
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [selectedId, setSelectedId] = useState<string>();
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    apiClient
+      .get<AdminUser[]>(`/admin/users${query ? `?q=${encodeURIComponent(query)}` : ""}`, { signal: controller.signal })
+      .then((response) => {
+        setUsers(response.data);
+        const first = response.data[0];
+        if (!selectedId && first) selectUser(first);
+      })
+      .catch(() => toast({ title: "Нет доступа к админке или backend недоступен", variant: "error" }))
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+    // selected user is intentionally preserved while searching.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, toast]);
+
+  const selected = useMemo(() => users.find((user) => user.id === selectedId), [selectedId, users]);
+
+  function selectUser(user: AdminUser) {
+    setSelectedId(user.id);
+    setDraft({
+      fullName: user.fullName,
+      username: user.username,
+      city: user.city ?? "",
+      role: user.role,
+      emailVerified: user.emailVerified,
+      xpOverride: user.xpOverride == null ? "" : String(user.xpOverride),
+      streakOverride: user.streakOverride == null ? "" : String(user.streakOverride)
+    });
+  }
+
+  async function saveUser() {
+    if (!selected || !draft) return;
+    setSaving(true);
+    try {
+      const response = await apiClient.put<AdminUser>(`/admin/users/${selected.id}`, {
+        fullName: draft.fullName,
+        username: draft.username,
+        city: draft.city,
+        role: draft.role,
+        emailVerified: draft.emailVerified,
+        xpOverride: draft.xpOverride === "" ? null : Number(draft.xpOverride),
+        streakOverride: draft.streakOverride === "" ? null : Number(draft.streakOverride)
+      });
+      setUsers((current) => current.map((user) => (user.id === response.data.id ? response.data : user)));
+      selectUser(response.data);
+      toast({ title: "Настройки игрока сохранены", variant: "success" });
+    } catch {
+      toast({ title: "Не удалось сохранить пользователя", variant: "error" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="relative overflow-hidden">
+      <div className="premium-grid pointer-events-none absolute inset-x-0 top-0 h-[420px]" />
+      <div className="page-shell relative space-y-6">
+        <section className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+          <div>
+            <Badge variant="outline" className="mb-3 gap-2">
+              <Shield className="h-3.5 w-3.5 text-primary" />
+              Admin Control
+            </Badge>
+            <h1 className="text-4xl font-semibold tracking-tight">Админка игроков</h1>
+            <p className="mt-2 max-w-2xl text-muted-foreground">
+              Управляй профилями, ролями, XP override и streak override для каждого пользователя.
+            </p>
+          </div>
+          <div className="relative w-full lg:w-[360px]">
+            <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input className="ps-9" placeholder="Поиск по username, email, имени" value={query} onChange={(event) => setQuery(event.target.value)} />
+          </div>
+        </section>
+
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_430px]">
+          <Card className="bg-card/90 shadow-soft backdrop-blur">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                Пользователи
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {loading ? <div className="skeleton h-40" /> : null}
+              {!loading && users.length === 0 ? (
+                <div className="rounded-lg border bg-background/60 p-4 text-sm text-muted-foreground">Ничего не найдено.</div>
+              ) : null}
+              {users.map((user) => (
+                <button
+                  key={user.id}
+                  type="button"
+                  onClick={() => selectUser(user)}
+                  className={[
+                    "grid w-full gap-3 rounded-lg border bg-background/60 p-3 text-left transition hover:border-primary/50 md:grid-cols-[minmax(0,1fr)_320px]",
+                    selectedId === user.id ? "border-primary bg-primary/10" : ""
+                  ].join(" ")}
+                >
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{user.username}</div>
+                    <div className="truncate text-sm text-muted-foreground">{user.email}</div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 text-xs text-muted-foreground">
+                    <span>{user.role}</span>
+                    <span>{user.xp} XP</span>
+                    <span>{user.currentStreak} streak</span>
+                    <span>{user.wins} wins</span>
+                  </div>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/90 shadow-soft backdrop-blur">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <SlidersHorizontal className="h-5 w-5 text-primary" />
+                Настройки
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!selected || !draft ? (
+                <div className="rounded-lg border bg-background/60 p-4 text-sm text-muted-foreground">Выбери пользователя слева.</div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Mini label="Игр" value={selected.gamesPlayed} />
+                    <Mini label="Побед" value={selected.wins} />
+                    <Mini label="Лучшее время" value={selected.bestTimeSeconds ? formatSeconds(selected.bestTimeSeconds) : "--:--"} />
+                    <Mini label="Точность" value={`${selected.averageAccuracy}%`} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Full name</Label>
+                    <Input value={draft.fullName} onChange={(event) => setDraft({ ...draft, fullName: event.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Username</Label>
+                    <Input value={draft.username} onChange={(event) => setDraft({ ...draft, username: event.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>City</Label>
+                    <Input value={draft.city} onChange={(event) => setDraft({ ...draft, city: event.target.value })} />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Role</Label>
+                      <Select value={draft.role} onValueChange={(value) => setDraft({ ...draft, role: value as AdminUser["role"] })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USER">USER</SelectItem>
+                          <SelectItem value="PRO">PRO</SelectItem>
+                          <SelectItem value="ADMIN">ADMIN</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <label className="mt-8 flex items-center gap-2 rounded-lg border bg-background/60 px-3 py-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={draft.emailVerified}
+                        onChange={(event) => setDraft({ ...draft, emailVerified: event.target.checked })}
+                      />
+                      Email verified
+                    </label>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>XP override</Label>
+                      <Input type="number" value={draft.xpOverride} placeholder={`${selected.xp}`} onChange={(event) => setDraft({ ...draft, xpOverride: event.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Streak override</Label>
+                      <Input type="number" value={draft.streakOverride} placeholder={`${selected.currentStreak}`} onChange={(event) => setDraft({ ...draft, streakOverride: event.target.value })} />
+                    </div>
+                  </div>
+                  <Button className="w-full" onClick={saveUser} disabled={saving}>
+                    <Save className="h-4 w-4" />
+                    {saving ? "Сохраняем..." : "Сохранить"}
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Mini({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-lg border bg-background/60 p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 font-mono text-lg font-semibold">{value}</div>
+    </div>
+  );
+}

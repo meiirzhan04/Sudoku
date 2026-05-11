@@ -125,6 +125,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { href: "/battle", label: nav.battle },
     { href: "/leaderboard", label: nav.leaderboard },
     ...(user ? [{ href: "/profile", label: nav.profile }, { href: "/settings", label: nav.settings }] : []),
+    ...(user?.role === "ADMIN" ? [{ href: "/admin", label: "Admin" }] : []),
     { href: "/pro", label: nav.pricing }
   ];
 

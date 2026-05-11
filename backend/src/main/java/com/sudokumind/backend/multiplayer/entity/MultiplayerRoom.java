@@ -1,6 +1,7 @@
 package com.sudokumind.backend.multiplayer.entity;
 
 import com.sudokumind.backend.common.enums.RoomStatus;
+import com.sudokumind.backend.common.enums.Difficulty;
 import com.sudokumind.backend.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -39,6 +40,13 @@ public class MultiplayerRoom {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)
     private int[][] solution;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Difficulty difficulty = Difficulty.MEDIUM;
+
+    @Column(nullable = false)
+    private String mode = "CLASSIC";
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

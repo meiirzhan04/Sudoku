@@ -18,8 +18,11 @@ public class MultiplayerController {
     }
 
     @PostMapping
-    public CreateRoomResponse create() {
-        return multiplayerService.createRoom(CurrentUser.id());
+    public CreateRoomResponse create(@RequestBody(required = false) CreateBattleRoomRequest request) {
+        if (request == null) {
+            return multiplayerService.createRoom(CurrentUser.id());
+        }
+        return multiplayerService.createRoom(CurrentUser.id(), request.difficulty(), request.mode());
     }
 
     @PostMapping("/join")
@@ -29,7 +32,7 @@ public class MultiplayerController {
 
     @GetMapping("/{roomId}")
     public RoomResponse room(@PathVariable UUID roomId) {
-        return multiplayerService.room(roomId);
+        return multiplayerService.room(roomId, CurrentUser.id());
     }
 
     @PostMapping("/{roomId}/start")
@@ -45,5 +48,15 @@ public class MultiplayerController {
     @PostMapping("/{roomId}/leave")
     public RoomResponse leave(@PathVariable UUID roomId) {
         return multiplayerService.leave(CurrentUser.id(), roomId);
+    }
+
+    @PutMapping("/{roomId}/move")
+    public RoomEvent move(@PathVariable UUID roomId, @Valid @RequestBody MultiplayerMoveRequest request) {
+        return multiplayerService.move(CurrentUser.id(), roomId, request);
+    }
+
+    @PutMapping("/{roomId}/progress")
+    public RoomEvent progress(@PathVariable UUID roomId, @Valid @RequestBody ProgressRequest request) {
+        return multiplayerService.progress(CurrentUser.id(), roomId, request);
     }
 }
