@@ -26,6 +26,8 @@ spring:
 
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  admin:
+    emails: ${ADMIN_EMAILS:}
   jwt:
     secret: ${JWT_SECRET:replace-this-with-a-very-long-256-bit-secret-for-local-dev-only}
     access-token-minutes: 15

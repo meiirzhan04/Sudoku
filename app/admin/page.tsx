@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { AlertTriangle, LockKeyhole, Save, Search, Shield, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BadgeCheck, Crown, LockKeyhole, Save, Search, Shield, SlidersHorizontal, Trophy, Users, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -110,6 +110,17 @@ export default function AdminPage() {
   }, [query, toast]);
 
   const selected = useMemo(() => users.find((user) => user.id === selectedId), [selectedId, users]);
+  const summary = useMemo(() => {
+    const wins = users.reduce((total, user) => total + user.wins, 0);
+    const accuracy = users.length ? Math.round(users.reduce((total, user) => total + Number(user.averageAccuracy ?? 0), 0) / users.length) : 0;
+    return {
+      users: users.length,
+      admins: users.filter((user) => user.role === "ADMIN").length,
+      pro: users.filter((user) => user.role === "PRO").length,
+      wins,
+      accuracy
+    };
+  }, [users]);
 
   function selectUser(user: AdminUser) {
     setSelectedId(user.id);
@@ -194,6 +205,14 @@ export default function AdminPage() {
           </div>
         </section>
 
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <SummaryCard icon={Users} label="Total users" value={summary.users} />
+          <SummaryCard icon={Shield} label="Admins" value={summary.admins} />
+          <SummaryCard icon={Crown} label="Pro users" value={summary.pro} />
+          <SummaryCard icon={Trophy} label="Total wins" value={summary.wins} />
+          <SummaryCard icon={BadgeCheck} label="Avg accuracy" value={`${summary.accuracy}%`} />
+        </section>
+
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_430px]">
           <Card className="bg-card/90 shadow-soft backdrop-blur">
             <CardHeader>
@@ -218,7 +237,10 @@ export default function AdminPage() {
                   ].join(" ")}
                 >
                   <div className="min-w-0">
-                    <div className="truncate font-medium">{user.username}</div>
+                    <div className="flex items-center gap-2 truncate font-medium">
+                      <span className="truncate">{user.username}</span>
+                      {user.emailVerified ? <BadgeCheck className="h-4 w-4 text-primary" /> : null}
+                    </div>
                     <div className="truncate text-sm text-muted-foreground">{user.email}</div>
                   </div>
                   <div className="grid grid-cols-4 gap-2 text-xs text-muted-foreground">
@@ -249,6 +271,9 @@ export default function AdminPage() {
                     <Mini label="Wins" value={selected.wins} />
                     <Mini label="Best time" value={selected.bestTimeSeconds ? formatSeconds(selected.bestTimeSeconds) : "--:--"} />
                     <Mini label="Accuracy" value={`${selected.averageAccuracy}%`} />
+                  </div>
+                  <div className="rounded-lg border bg-background/60 p-3 text-xs text-muted-foreground">
+                    Last backend update: <span className="font-mono text-foreground">{new Date(selected.updatedAt).toLocaleString()}</span>
                   </div>
                   <div className="space-y-2">
                     <Label>Full name</Label>
@@ -333,6 +358,22 @@ function AccessCard({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function SummaryCard({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string | number }) {
+  return (
+    <Card className="bg-card/90 shadow-soft backdrop-blur">
+      <CardContent className="flex items-center justify-between gap-3 p-4">
+        <div>
+          <div className="text-xs text-muted-foreground">{label}</div>
+          <div className="mt-1 font-mono text-2xl font-semibold">{value}</div>
+        </div>
+        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <Icon className="h-5 w-5" />
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

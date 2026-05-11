@@ -3,6 +3,7 @@ package com.sudokumind.backend.auth.service;
 import com.sudokumind.backend.auth.dto.*;
 import com.sudokumind.backend.auth.entity.RefreshToken;
 import com.sudokumind.backend.auth.security.JwtService;
+import com.sudokumind.backend.admin.AdminBootstrap;
 import com.sudokumind.backend.common.enums.AuthProvider;
 import com.sudokumind.backend.common.enums.Language;
 import com.sudokumind.backend.common.exception.ApiException;
@@ -27,6 +28,7 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final UserMapper userMapper;
     private final UserService userService;
+    private final AdminBootstrap adminBootstrap;
 
     public AuthService(
             UserRepository userRepository,
@@ -34,7 +36,8 @@ public class AuthService {
             JwtService jwtService,
             RefreshTokenService refreshTokenService,
             UserMapper userMapper,
-            UserService userService
+            UserService userService,
+            AdminBootstrap adminBootstrap
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -42,6 +45,7 @@ public class AuthService {
         this.refreshTokenService = refreshTokenService;
         this.userMapper = userMapper;
         this.userService = userService;
+        this.adminBootstrap = adminBootstrap;
     }
 
     @Transactional
@@ -65,6 +69,9 @@ public class AuthService {
         user.setLanguage(request.language() == null ? Language.en : request.language());
         user.setProvider(AuthProvider.LOCAL);
         user.setEmailVerified(false);
+        if (adminBootstrap.shouldPromote(user.getEmail())) {
+            user.setRole(com.sudokumind.backend.common.enums.UserRole.ADMIN);
+        }
         userRepository.save(user);
         return new RegisterResponse("Registration successful.", user.getId());
     }
@@ -107,6 +114,9 @@ public class AuthService {
 
     @Transactional
     public AuthResponse tokens(User user, boolean rememberMe) {
+        if (adminBootstrap.shouldPromote(user.getEmail())) {
+            user = adminBootstrap.promote(user);
+        }
         user.setLastSeenAt(Instant.now());
         userRepository.save(user);
         String accessToken = jwtService.createAccessToken(user);
