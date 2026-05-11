@@ -120,6 +120,29 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [loadUser]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    function heartbeat() {
+      const token = window.localStorage.getItem("sudokumind-access-token");
+      if (!token) return;
+      void fetch("/api/users/me/heartbeat", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }).catch(() => undefined);
+    }
+
+    heartbeat();
+    const timer = window.setInterval(heartbeat, 30000);
+    window.addEventListener("focus", heartbeat);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", heartbeat);
+    };
+  }, [user]);
+
   function signOut() {
     window.localStorage.removeItem("sudokumind-access-token");
     window.localStorage.removeItem("sudokumind-refresh-token");

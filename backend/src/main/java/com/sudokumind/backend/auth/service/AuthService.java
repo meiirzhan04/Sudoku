@@ -16,6 +16,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Locale;
 
 @Service
@@ -106,6 +107,8 @@ public class AuthService {
 
     @Transactional
     public AuthResponse tokens(User user, boolean rememberMe) {
+        user.setLastSeenAt(Instant.now());
+        userRepository.save(user);
         String accessToken = jwtService.createAccessToken(user);
         RefreshToken refreshToken = refreshTokenService.create(user, rememberMe);
         return new AuthResponse(accessToken, refreshToken.getToken(), userMapper.toResponse(user, userService.stats(user.getId())));

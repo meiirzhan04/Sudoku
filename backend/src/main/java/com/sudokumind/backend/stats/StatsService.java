@@ -29,7 +29,7 @@ public class StatsService {
         return new GlobalStatsResponse(
                 userRepository.count(),
                 gameSessionRepository.countByCreatedAtAfter(todayStart),
-                gameSessionRepository.countActivePlayersSince(activeSince)
+                userRepository.countByLastSeenAtAfter(activeSince)
         );
     }
 
@@ -45,7 +45,7 @@ public class StatsService {
 
     public List<OnlinePlayerResponse> onlinePlayers() {
         Instant since = Instant.now().minusSeconds(300);
-        return userRepository.findTop50ByUpdatedAtAfterOrderByUpdatedAtDesc(since).stream()
+        return userRepository.findTop50ByLastSeenAtAfterOrderByLastSeenAtDesc(since).stream()
                 .map(user -> new OnlinePlayerResponse(
                         user.getId(),
                         user.getUsername(),

@@ -60,6 +60,8 @@ type FriendResponse = {
   online: boolean;
 };
 
+type UserSuggestion = FriendResponse["user"];
+
 type FriendRequestResponse = {
   id: string;
   sender: { username: string };
@@ -114,6 +116,7 @@ export function BattleClient() {
   const { toast } = useToast();
   const [authed, setAuthed] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserSuggestion | null>(null);
   const [stage, setStage] = useState<Stage>("setup");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [mode, setMode] = useState<BattleMode>("CLASSIC");
@@ -127,6 +130,8 @@ export function BattleClient() {
   const [gameInvites, setGameInvites] = useState<GameInviteResponse[]>([]);
   const [onlinePlayers, setOnlinePlayers] = useState<OnlinePlayer[]>([]);
   const [friendQuery, setFriendQuery] = useState("");
+  const [friendSuggestions, setFriendSuggestions] = useState<UserSuggestion[]>([]);
+  const [friendSearching, setFriendSearching] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const given = useMemo(() => (room ? room.puzzle.map((row) => row.map((value) => value !== 0)) : []), [room]);
@@ -167,9 +172,43 @@ export function BattleClient() {
     const code = params.get("room");
     if (code) setJoinCode(code.toUpperCase());
     if (hasAuthToken()) {
-      void apiClient.get<{ id: string }>("/users/me").then((response) => setCurrentUserId(response.data.id)).catch(() => undefined);
+      void apiClient.get<UserSuggestion>("/users/me").then((response) => {
+        setCurrentUserId(response.data.id);
+        setCurrentUser(response.data);
+      }).catch(() => undefined);
     }
   }, []);
+
+  useEffect(() => {
+    const value = friendQuery.trim();
+    if (!authed || value.length < 2) {
+      setFriendSuggestions([]);
+      setFriendSearching(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setFriendSearching(true);
+      apiClient
+        .get<UserSuggestion[]>(`/friends/search?username=${encodeURIComponent(value)}`, { signal: controller.signal })
+        .then((response) => {
+          const friendIds = new Set(friends.map((friend) => friend.user.id));
+          setFriendSuggestions(response.data.filter((user) => user.id !== currentUserId && !friendIds.has(user.id)).slice(0, 5));
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setFriendSuggestions([]);
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setFriendSearching(false);
+        });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [authed, currentUserId, friendQuery, friends]);
 
   useEffect(() => {
     if (!authed) return;
@@ -216,7 +255,7 @@ export function BattleClient() {
       setElapsed(0);
       setStage("lobby");
     } catch {
-      toast({ title: "Не удалось создать комнату. Войди в аккаунт и попробуй снова.", variant: "error" });
+      toast({ title: "Сессия не подтверждена. Войди ещё раз и попробуй создать комнату.", variant: "info" });
     } finally {
       setBusy(false);
     }
@@ -282,9 +321,10 @@ export function BattleClient() {
       await apiClient.post("/friends/requests", { receiverUsername: username.trim() });
       toast({ title: "Заявка в друзья отправлена", variant: "success" });
       setFriendQuery("");
+      setFriendSuggestions([]);
       await loadFriends();
     } catch {
-      toast({ title: "Не удалось отправить заявку", variant: "error" });
+      toast({ title: "Пользователь не найден или заявка уже отправлена", variant: "info" });
     }
   }
 
@@ -296,7 +336,7 @@ export function BattleClient() {
 
   async function inviteFriend(friendId: string) {
     if (!room) {
-      toast({ title: "Create a room first, then invite a friend.", variant: "error" });
+      toast({ title: "Сначала создай комнату, потом отправь приглашение другу.", variant: "info" });
       return;
     }
     try {
@@ -463,8 +503,11 @@ export function BattleClient() {
             friends={friends}
             incoming={incoming}
             gameInvites={gameInvites}
+            currentUser={currentUser}
             friendQuery={friendQuery}
             setFriendQuery={setFriendQuery}
+            friendSuggestions={friendSuggestions}
+            friendSearching={friendSearching}
             sendFriendRequest={sendFriendRequest}
             acceptRequest={acceptRequest}
             inviteFriend={inviteFriend}
@@ -604,8 +647,11 @@ function FriendsPanel({
   friends,
   incoming,
   gameInvites,
+  currentUser,
   friendQuery,
   setFriendQuery,
+  friendSuggestions,
+  friendSearching,
   sendFriendRequest,
   acceptRequest,
   inviteFriend,
@@ -615,8 +661,11 @@ function FriendsPanel({
   friends: FriendResponse[];
   incoming: FriendRequestResponse[];
   gameInvites: GameInviteResponse[];
+  currentUser: UserSuggestion | null;
   friendQuery: string;
   setFriendQuery: (value: string) => void;
+  friendSuggestions: UserSuggestion[];
+  friendSearching: boolean;
   sendFriendRequest: (username: string) => void;
   acceptRequest: (id: string) => void;
   inviteFriend: (friendId: string) => void;
@@ -633,9 +682,39 @@ function FriendsPanel({
           <div className="relative flex-1">
             <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input className="ps-9" placeholder="username друга" value={friendQuery} onChange={(event) => setFriendQuery(event.target.value)} />
+            {(friendSearching || friendSuggestions.length > 0 || friendQuery.trim().length >= 2) ? (
+              <div className="absolute inset-x-0 top-12 z-20 overflow-hidden rounded-md border bg-card shadow-soft">
+                {friendSearching ? <div className="px-3 py-2 text-sm text-muted-foreground">Ищем игроков...</div> : null}
+                {!friendSearching && friendSuggestions.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">Игроков с таким username не найдено.</div>
+                ) : null}
+                {friendSuggestions.map((user) => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition hover:bg-muted"
+                    onClick={() => setFriendQuery(user.username)}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Avatar className="h-7 w-7"><AvatarImage src={user.avatarUrl ?? undefined} /><AvatarFallback>{initials(user.username)}</AvatarFallback></Avatar>
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{user.username}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{user.city ?? "Global"} / {user.stats.wins} wins</span>
+                      </span>
+                    </span>
+                    <Badge variant="outline">Выбрать</Badge>
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
           <Button size="icon" onClick={() => sendFriendRequest(friendQuery)} aria-label="Добавить друга"><Plus className="h-4 w-4" /></Button>
         </div>
+        {currentUser ? (
+          <div className="rounded-lg border bg-background/60 p-3 text-xs text-muted-foreground">
+            Ты онлайн как <span className="font-medium text-foreground">{currentUser.username}</span>. Друг должен войти в аккаунт и открыть сайт, тогда появится в онлайн.
+          </div>
+        ) : null}
         {incoming.length ? (
           <div className="space-y-2">
             {incoming.map((request) => (
@@ -687,9 +766,14 @@ function FriendsPanel({
 function OnlinePanel({ players }: { players: OnlinePlayer[] }) {
   return (
     <Card className="bg-card/90 shadow-soft backdrop-blur">
-      <CardHeader><CardTitle>Онлайн сейчас</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between gap-3">
+          <span>Онлайн сейчас</span>
+          <Badge variant="outline" className="gap-1"><Wifi className="h-3.5 w-3.5 text-primary" /> {players.length}</Badge>
+        </CardTitle>
+      </CardHeader>
       <CardContent className="space-y-2">
-        {players.length === 0 ? <div className="rounded-lg border bg-background/60 p-3 text-sm text-muted-foreground">Пока никого онлайн не видно.</div> : null}
+        {players.length === 0 ? <div className="rounded-lg border bg-background/60 p-3 text-sm text-muted-foreground">Онлайн появится, когда игрок войдёт в аккаунт и откроет сайт. Телефон и ноутбук лучше проверить под разными аккаунтами.</div> : null}
         {players.map((player) => (
           <div key={player.id} className="flex items-center justify-between rounded-lg border bg-background/60 p-3">
             <div className="flex items-center gap-3">

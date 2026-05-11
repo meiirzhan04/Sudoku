@@ -23,6 +23,11 @@ public class UserController {
         return userService.me(CurrentUser.id());
     }
 
+    @PostMapping("/me/heartbeat")
+    public void heartbeat() {
+        userService.heartbeat(CurrentUser.id());
+    }
+
     @GetMapping("/me/dashboard")
     public DashboardResponse dashboard() {
         return userService.dashboard(CurrentUser.id());

@@ -61,4 +61,6 @@ public class User {
     @UpdateTimestamp
     @Column(nullable = false)
     private Instant updatedAt;
+
+    private Instant lastSeenAt;
 }

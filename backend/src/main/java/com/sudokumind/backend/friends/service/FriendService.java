@@ -86,7 +86,7 @@ public class FriendService {
         return friendRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
                 .map(friend -> new FriendResponse(
                         publicUser(friend.getFriend()),
-                        friend.getFriend().getUpdatedAt().isAfter(onlineSince),
+                        friend.getFriend().getLastSeenAt() != null && friend.getFriend().getLastSeenAt().isAfter(onlineSince),
                         friend.getCreatedAt()
                 ))
                 .toList();

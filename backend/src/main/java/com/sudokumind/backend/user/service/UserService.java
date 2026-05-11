@@ -50,6 +50,13 @@ public class UserService {
     }
 
     @Transactional
+    public void heartbeat(UUID id) {
+        User user = require(id);
+        user.setLastSeenAt(Instant.now());
+        userRepository.save(user);
+    }
+
+    @Transactional
     public UserResponse update(UUID id, UpdateProfileRequest request) {
         User user = require(id);
         userRepository.findByUsernameIgnoreCase(request.username())
