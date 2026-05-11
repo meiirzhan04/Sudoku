@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const protectedRoutes = ["/daily", "/friends", "/multiplayer"];
+const protectedRoutes = ["/admin", "/daily", "/friends", "/multiplayer"];
 
 export function middleware(request: NextRequest) {
   const response = NextResponse.next({ request });

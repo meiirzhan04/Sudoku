@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Crown, Gamepad2, Globe2, Home, LogOut, Moon, Settings, SunMedium, UserRound } from "lucide-react";
+import { Crown, Gamepad2, Globe2, Home, LogOut, Moon, Settings, Shield, SunMedium, UserRound } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -72,6 +72,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const isAdminRoute = pathname?.startsWith("/admin");
 
   const loadUser = useCallback(() => {
     const token = window.localStorage.getItem("sudokumind-access-token");
@@ -119,16 +120,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [loadUser]);
 
-  const links = [
-    { href: "/play", label: t("nav.play") },
-    { href: "/daily", label: t("nav.daily") },
-    { href: "/battle", label: nav.battle },
-    { href: "/leaderboard", label: nav.leaderboard },
-    ...(user ? [{ href: "/profile", label: nav.profile }, { href: "/settings", label: nav.settings }] : []),
-    ...(user?.role === "ADMIN" ? [{ href: "/admin", label: "Admin" }] : []),
-    { href: "/pro", label: nav.pricing }
-  ];
-
   function signOut() {
     window.localStorage.removeItem("sudokumind-access-token");
     window.localStorage.removeItem("sudokumind-refresh-token");
@@ -138,6 +129,48 @@ export function AppShell({ children }: { children: ReactNode }) {
     setUser(null);
     router.push("/");
   }
+
+  if (isAdminRoute) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-40 border-b border-primary/20 bg-background/95 backdrop-blur-xl">
+          <div className="h-0.5 bg-primary" />
+          <div className="mx-auto flex min-h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+            <Link href="/admin" className="flex items-center gap-2 font-semibold tracking-tight">
+              <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Shield className="h-5 w-5" />
+              </span>
+              <span>SudokuMind Admin</span>
+            </Link>
+            <div className="ms-auto flex items-center gap-2">
+              {authChecked && user ? (
+                <Badge variant={user.role === "ADMIN" ? "default" : "secondary"}>{user.role}</Badge>
+              ) : null}
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/">Open app</Link>
+              </Button>
+              {authChecked && user ? (
+                <Button variant="ghost" size="sm" onClick={signOut}>
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </header>
+        <main>{children}</main>
+      </div>
+    );
+  }
+
+  const links = [
+    { href: "/play", label: t("nav.play") },
+    { href: "/daily", label: t("nav.daily") },
+    { href: "/battle", label: nav.battle },
+    { href: "/leaderboard", label: nav.leaderboard },
+    ...(user ? [{ href: "/profile", label: nav.profile }, { href: "/settings", label: nav.settings }] : []),
+    { href: "/pro", label: nav.pricing }
+  ];
 
   const mobileLinks = [
     { href: "/play", label: t("nav.play"), icon: Gamepad2 },

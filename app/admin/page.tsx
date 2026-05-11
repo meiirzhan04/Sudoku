@@ -1,22 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Shield, Search, Save, SlidersHorizontal, Users } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { AlertTriangle, LockKeyhole, Save, Search, Shield, SlidersHorizontal, Users, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
-import { apiClient } from "@/lib/api-client";
+import { apiClient, hasAuthToken } from "@/lib/api-client";
 import { formatSeconds } from "@/lib/utils";
+
+type Role = "USER" | "ADMIN" | "PRO";
+type AccessState = "checking" | "login" | "forbidden" | "allowed";
+
+type SessionUser = {
+  id: string;
+  fullName: string;
+  username: string;
+  email: string;
+  role: Role;
+};
 
 type AdminUser = {
   id: string;
@@ -24,7 +30,7 @@ type AdminUser = {
   username: string;
   email: string;
   city?: string | null;
-  role: "USER" | "ADMIN" | "PRO";
+  role: Role;
   emailVerified: boolean;
   gamesPlayed: number;
   wins: number;
@@ -41,7 +47,7 @@ type Draft = {
   fullName: string;
   username: string;
   city: string;
-  role: AdminUser["role"];
+  role: Role;
   emailVerified: boolean;
   xpOverride: string;
   streakOverride: string;
@@ -49,6 +55,8 @@ type Draft = {
 
 export default function AdminPage() {
   const { toast } = useToast();
+  const [access, setAccess] = useState<AccessState>("checking");
+  const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
   const [query, setQuery] = useState("");
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
@@ -58,18 +66,46 @@ export default function AdminPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    apiClient
-      .get<AdminUser[]>(`/admin/users${query ? `?q=${encodeURIComponent(query)}` : ""}`, { signal: controller.signal })
-      .then((response) => {
+
+    async function loadAdmin() {
+      if (!hasAuthToken()) {
+        setAccess("login");
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const me = await apiClient.get<SessionUser>("/users/me", { signal: controller.signal });
+        setCurrentUser(me.data);
+
+        if (me.data.role !== "ADMIN") {
+          setAccess("forbidden");
+          setUsers([]);
+          setSelectedId(undefined);
+          setDraft(null);
+          return;
+        }
+
+        setAccess("allowed");
+        const response = await apiClient.get<AdminUser[]>(`/admin/users${query ? `?q=${encodeURIComponent(query)}` : ""}`, { signal: controller.signal });
         setUsers(response.data);
-        const first = response.data[0];
-        if (!selectedId && first) selectUser(first);
-      })
-      .catch(() => toast({ title: "Нет доступа к админке или backend недоступен", variant: "error" }))
-      .finally(() => setLoading(false));
+
+        const stillSelected = response.data.find((user) => user.id === selectedId);
+        const nextSelected = stillSelected ?? response.data[0];
+        if (nextSelected) selectUser(nextSelected);
+      } catch (error: any) {
+        if (controller.signal.aborted) return;
+        setAccess(error?.response?.status === 403 ? "forbidden" : "login");
+        toast({ title: "Admin access check failed", variant: "error" });
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+
+    void loadAdmin();
     return () => controller.abort();
-    // selected user is intentionally preserved while searching.
+    // The selected user is preserved while searching when possible.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, toast]);
 
@@ -103,12 +139,38 @@ export default function AdminPage() {
       });
       setUsers((current) => current.map((user) => (user.id === response.data.id ? response.data : user)));
       selectUser(response.data);
-      toast({ title: "Настройки игрока сохранены", variant: "success" });
+      toast({ title: "Player settings saved", variant: "success" });
     } catch {
-      toast({ title: "Не удалось сохранить пользователя", variant: "error" });
+      toast({ title: "Could not save player", variant: "error" });
     } finally {
       setSaving(false);
     }
+  }
+
+  if (access === "checking") {
+    return <AccessCard icon={LockKeyhole} title="Checking admin access" description="Verifying your administrator session before loading the console." />;
+  }
+
+  if (access === "login") {
+    return (
+      <AccessCard
+        icon={LockKeyhole}
+        title="Admin sign in required"
+        description="Use an administrator account to open this console. Player accounts cannot access admin tools."
+        action={<Button asChild><Link href="/login?next=/admin">Sign in as admin</Link></Button>}
+      />
+    );
+  }
+
+  if (access === "forbidden") {
+    return (
+      <AccessCard
+        icon={AlertTriangle}
+        title="Access denied"
+        description={`${currentUser?.username ?? "This account"} is not an administrator. Admin data was not loaded.`}
+        action={<Button variant="outline" asChild><Link href="/">Back to SudokuMind</Link></Button>}
+      />
+    );
   }
 
   return (
@@ -119,16 +181,16 @@ export default function AdminPage() {
           <div>
             <Badge variant="outline" className="mb-3 gap-2">
               <Shield className="h-3.5 w-3.5 text-primary" />
-              Admin Control
+              Secure operator console
             </Badge>
-            <h1 className="text-4xl font-semibold tracking-tight">Админка игроков</h1>
+            <h1 className="text-4xl font-semibold tracking-tight">Admin Console</h1>
             <p className="mt-2 max-w-2xl text-muted-foreground">
-              Управляй профилями, ролями, XP override и streak override для каждого пользователя.
+              Manage users, roles, email status, XP overrides, and streak overrides. This view is loaded only after an ADMIN role check.
             </p>
           </div>
           <div className="relative w-full lg:w-[360px]">
             <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input className="ps-9" placeholder="Поиск по username, email, имени" value={query} onChange={(event) => setQuery(event.target.value)} />
+            <Input className="ps-9" placeholder="Search username, email, name" value={query} onChange={(event) => setQuery(event.target.value)} />
           </div>
         </section>
 
@@ -137,13 +199,13 @@ export default function AdminPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" />
-                Пользователи
+                Users
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {loading ? <div className="skeleton h-40" /> : null}
               {!loading && users.length === 0 ? (
-                <div className="rounded-lg border bg-background/60 p-4 text-sm text-muted-foreground">Ничего не найдено.</div>
+                <div className="rounded-lg border bg-background/60 p-4 text-sm text-muted-foreground">No users found.</div>
               ) : null}
               {users.map((user) => (
                 <button
@@ -174,19 +236,19 @@ export default function AdminPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <SlidersHorizontal className="h-5 w-5 text-primary" />
-                Настройки
+                Player controls
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {!selected || !draft ? (
-                <div className="rounded-lg border bg-background/60 p-4 text-sm text-muted-foreground">Выбери пользователя слева.</div>
+                <div className="rounded-lg border bg-background/60 p-4 text-sm text-muted-foreground">Select a user to edit.</div>
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-2">
-                    <Mini label="Игр" value={selected.gamesPlayed} />
-                    <Mini label="Побед" value={selected.wins} />
-                    <Mini label="Лучшее время" value={selected.bestTimeSeconds ? formatSeconds(selected.bestTimeSeconds) : "--:--"} />
-                    <Mini label="Точность" value={`${selected.averageAccuracy}%`} />
+                    <Mini label="Games" value={selected.gamesPlayed} />
+                    <Mini label="Wins" value={selected.wins} />
+                    <Mini label="Best time" value={selected.bestTimeSeconds ? formatSeconds(selected.bestTimeSeconds) : "--:--"} />
+                    <Mini label="Accuracy" value={`${selected.averageAccuracy}%`} />
                   </div>
                   <div className="space-y-2">
                     <Label>Full name</Label>
@@ -203,7 +265,7 @@ export default function AdminPage() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Role</Label>
-                      <Select value={draft.role} onValueChange={(value) => setDraft({ ...draft, role: value as AdminUser["role"] })}>
+                      <Select value={draft.role} onValueChange={(value) => setDraft({ ...draft, role: value as Role })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="USER">USER</SelectItem>
@@ -233,7 +295,7 @@ export default function AdminPage() {
                   </div>
                   <Button className="w-full" onClick={saveUser} disabled={saving}>
                     <Save className="h-4 w-4" />
-                    {saving ? "Сохраняем..." : "Сохранить"}
+                    {saving ? "Saving..." : "Save player"}
                   </Button>
                 </>
               )}
@@ -241,6 +303,35 @@ export default function AdminPage() {
           </Card>
         </div>
       </div>
+    </div>
+  );
+}
+
+function AccessCard({
+  icon: Icon,
+  title,
+  description,
+  action
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="page-shell flex min-h-[calc(100vh-4rem)] items-center justify-center">
+      <Card className="w-full max-w-lg border-primary/20 bg-card/95 shadow-soft">
+        <CardContent className="space-y-5 p-6 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <Icon className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold">{title}</h1>
+            <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+          </div>
+          {action}
+        </CardContent>
+      </Card>
     </div>
   );
 }
