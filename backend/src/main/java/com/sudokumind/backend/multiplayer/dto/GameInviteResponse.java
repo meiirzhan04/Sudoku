@@ -12,6 +12,7 @@ public record GameInviteResponse(
         UUID receiverId,
         String receiverUsername,
         UUID roomId,
+        String roomCode,
         InviteStatus status,
         Instant expiresAt
 ) {

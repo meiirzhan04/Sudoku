@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/stats")
 public class StatsController {
@@ -31,4 +33,3 @@ public class StatsController {
         return statsService.onlinePlayers();
     }
 }
-import java.util.List;

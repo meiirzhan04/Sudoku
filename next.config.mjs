@@ -24,6 +24,7 @@ const nextConfig = {
       { source: "/api/leaderboard/:path*", destination: `${apiUrl}/api/leaderboard/:path*` },
       { source: "/api/admin/:path*", destination: `${apiUrl}/api/admin/:path*` },
       { source: "/api/friends/:path*", destination: `${apiUrl}/api/friends/:path*` },
+      { source: "/api/game-invites/:path*", destination: `${apiUrl}/api/game-invites/:path*` },
       { source: "/api/multiplayer/:path*", destination: `${apiUrl}/api/multiplayer/:path*` }
     ];
   }

@@ -67,6 +67,18 @@ type FriendRequestResponse = {
   status: string;
 };
 
+type GameInviteResponse = {
+  id: string;
+  senderId: string;
+  senderUsername: string;
+  receiverId: string;
+  receiverUsername: string;
+  roomId: string;
+  roomCode: string;
+  status: string;
+  expiresAt: string;
+};
+
 type OnlinePlayer = {
   id: string;
   username: string;
@@ -101,6 +113,7 @@ function filledPercent(board: Board) {
 export function BattleClient() {
   const { toast } = useToast();
   const [authed, setAuthed] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage>("setup");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [mode, setMode] = useState<BattleMode>("CLASSIC");
@@ -111,29 +124,31 @@ export function BattleClient() {
   const [elapsed, setElapsed] = useState(0);
   const [friends, setFriends] = useState<FriendResponse[]>([]);
   const [incoming, setIncoming] = useState<FriendRequestResponse[]>([]);
+  const [gameInvites, setGameInvites] = useState<GameInviteResponse[]>([]);
   const [onlinePlayers, setOnlinePlayers] = useState<OnlinePlayer[]>([]);
   const [friendQuery, setFriendQuery] = useState("");
   const [busy, setBusy] = useState(false);
 
   const given = useMemo(() => (room ? room.puzzle.map((row) => row.map((value) => value !== 0)) : []), [room]);
   const me = useMemo(() => {
-    if (!room || typeof window === "undefined") return undefined;
-    const token = window.localStorage.getItem("sudokumind-access-token");
-    return room.players.find((player) => player.connected) ?? room.players[0];
-  }, [room]);
+    if (!room) return undefined;
+    return room.players.find((player) => player.userId === currentUserId) ?? room.players[0];
+  }, [currentUserId, room]);
   const solved = room ? boardComplete(entries, room.solution) : false;
   const inviteLink = room ? `${window.location.origin}/battle?room=${room.roomCode}` : "";
   const isHost = Boolean(room && me?.userId === room.hostUserId);
 
   const loadFriends = useCallback(async () => {
     if (!hasAuthToken()) return;
-    const [friendsResponse, incomingResponse, onlineResponse] = await Promise.all([
+    const [friendsResponse, incomingResponse, gameInvitesResponse, onlineResponse] = await Promise.all([
       apiClient.get<FriendResponse[]>("/friends"),
       apiClient.get<FriendRequestResponse[]>("/friends/requests/incoming"),
+      apiClient.get<GameInviteResponse[]>("/game-invites/incoming"),
       apiClient.get<OnlinePlayer[]>("/stats/players/online")
     ]);
     setFriends(friendsResponse.data);
     setIncoming(incomingResponse.data);
+    setGameInvites(gameInvitesResponse.data);
     setOnlinePlayers(onlineResponse.data);
   }, []);
 
@@ -151,6 +166,9 @@ export function BattleClient() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("room");
     if (code) setJoinCode(code.toUpperCase());
+    if (hasAuthToken()) {
+      void apiClient.get<{ id: string }>("/users/me").then((response) => setCurrentUserId(response.data.id)).catch(() => undefined);
+    }
   }, []);
 
   useEffect(() => {
@@ -273,6 +291,39 @@ export function BattleClient() {
   async function acceptRequest(id: string) {
     await apiClient.put(`/friends/requests/${id}/accept`);
     toast({ title: "Друг добавлен", variant: "success" });
+    await loadFriends();
+  }
+
+  async function inviteFriend(friendId: string) {
+    if (!room) {
+      toast({ title: "Create a room first, then invite a friend.", variant: "error" });
+      return;
+    }
+    try {
+      await apiClient.post("/game-invites", { friendId, roomId: room.id });
+      toast({ title: "Invite sent", variant: "success" });
+      await loadFriends();
+    } catch {
+      toast({ title: "Invite was not sent", variant: "error" });
+    }
+  }
+
+  async function acceptGameInvite(invite: GameInviteResponse) {
+    try {
+      await apiClient.put(`/game-invites/${invite.id}/accept`);
+      const response = await apiClient.get<RoomResponse>(`/multiplayer/rooms/${invite.roomId}`);
+      setRoom(response.data);
+      setEntries(cloneBoard(response.data.currentBoard));
+      setElapsed(0);
+      setStage(response.data.status === "ACTIVE" ? "playing" : response.data.status === "FINISHED" ? "results" : "lobby");
+      await loadFriends();
+    } catch {
+      toast({ title: "Could not join invite", variant: "error" });
+    }
+  }
+
+  async function declineGameInvite(id: string) {
+    await apiClient.put(`/game-invites/${id}/decline`).catch(() => undefined);
     await loadFriends();
   }
 
@@ -411,11 +462,14 @@ export function BattleClient() {
           <FriendsPanel
             friends={friends}
             incoming={incoming}
+            gameInvites={gameInvites}
             friendQuery={friendQuery}
             setFriendQuery={setFriendQuery}
             sendFriendRequest={sendFriendRequest}
             acceptRequest={acceptRequest}
-            joinRoom={joinRoom}
+            inviteFriend={inviteFriend}
+            acceptGameInvite={acceptGameInvite}
+            declineGameInvite={declineGameInvite}
           />
           <OnlinePanel players={onlinePlayers} />
         </section>
@@ -549,19 +603,25 @@ function ResultPanel({ room, leaveRoom, rematch }: { room: RoomResponse; leaveRo
 function FriendsPanel({
   friends,
   incoming,
+  gameInvites,
   friendQuery,
   setFriendQuery,
   sendFriendRequest,
   acceptRequest,
-  joinRoom
+  inviteFriend,
+  acceptGameInvite,
+  declineGameInvite
 }: {
   friends: FriendResponse[];
   incoming: FriendRequestResponse[];
+  gameInvites: GameInviteResponse[];
   friendQuery: string;
   setFriendQuery: (value: string) => void;
   sendFriendRequest: (username: string) => void;
   acceptRequest: (id: string) => void;
-  joinRoom: (code: string) => void;
+  inviteFriend: (friendId: string) => void;
+  acceptGameInvite: (invite: GameInviteResponse) => void;
+  declineGameInvite: (id: string) => void;
 }) {
   return (
     <Card className="bg-card/90 shadow-soft backdrop-blur">
@@ -586,6 +646,19 @@ function FriendsPanel({
             ))}
           </div>
         ) : null}
+        {gameInvites.length ? (
+          <div className="space-y-2">
+            {gameInvites.map((invite) => (
+              <div key={invite.id} className="flex items-center justify-between gap-3 rounded-lg border bg-background/60 p-3 text-sm">
+                <span>{invite.senderUsername} invites you to {invite.roomCode}</span>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => acceptGameInvite(invite)}>Join</Button>
+                  <Button size="sm" variant="ghost" onClick={() => declineGameInvite(invite.id)}>Decline</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
         <div className="grid gap-2 md:grid-cols-2">
           {friends.map((friend) => (
             <div key={friend.user.id} className="flex items-center justify-between gap-3 rounded-lg border bg-background/60 p-3">
@@ -599,7 +672,7 @@ function FriendsPanel({
                   <div className="truncate text-xs text-muted-foreground">{friend.user.city ?? "Global"} / {friend.user.stats.wins} wins</div>
                 </div>
               </div>
-              <Button variant="outline" size="sm" onClick={() => joinRoom(friend.user.username)}>
+              <Button variant="outline" size="sm" onClick={() => inviteFriend(friend.user.id)}>
                 <Send className="h-4 w-4" />
                 Invite
               </Button>

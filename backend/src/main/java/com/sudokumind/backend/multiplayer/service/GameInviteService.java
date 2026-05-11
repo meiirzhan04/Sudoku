@@ -3,6 +3,7 @@ package com.sudokumind.backend.multiplayer.service;
 import com.sudokumind.backend.common.enums.InviteStatus;
 import com.sudokumind.backend.multiplayer.dto.*;
 import com.sudokumind.backend.multiplayer.entity.GameInvite;
+import com.sudokumind.backend.multiplayer.entity.MultiplayerRoom;
 import com.sudokumind.backend.multiplayer.repository.GameInviteRepository;
 import com.sudokumind.backend.multiplayer.repository.MultiplayerRoomRepository;
 import com.sudokumind.backend.user.entity.User;
@@ -32,7 +33,9 @@ public class GameInviteService {
     public GameInviteResponse create(UUID senderId, GameInviteRequest request) {
         User sender = userService.require(senderId);
         User receiver = userService.require(request.friendId());
-        var room = roomRepository.findById(multiplayerService.createRoom(senderId).roomId()).orElseThrow();
+        MultiplayerRoom room = request.roomId() == null
+                ? roomRepository.findById(multiplayerService.createRoom(senderId).roomId()).orElseThrow()
+                : roomRepository.findById(request.roomId()).orElseThrow();
         GameInvite invite = new GameInvite();
         invite.setSender(sender);
         invite.setReceiver(receiver);
@@ -61,6 +64,6 @@ public class GameInviteService {
     }
 
     private GameInviteResponse toResponse(GameInvite invite) {
-        return new GameInviteResponse(invite.getId(), invite.getSender().getId(), invite.getSender().getUsername(), invite.getReceiver().getId(), invite.getReceiver().getUsername(), invite.getRoom().getId(), invite.getStatus(), invite.getExpiresAt());
+        return new GameInviteResponse(invite.getId(), invite.getSender().getId(), invite.getSender().getUsername(), invite.getReceiver().getId(), invite.getReceiver().getUsername(), invite.getRoom().getId(), invite.getRoom().getRoomCode(), invite.getStatus(), invite.getExpiresAt());
     }
 }

@@ -4,5 +4,5 @@ import jakarta.validation.constraints.NotNull;
 
 import java.util.UUID;
 
-public record GameInviteRequest(@NotNull UUID friendId) {
+public record GameInviteRequest(@NotNull UUID friendId, UUID roomId) {
 }
