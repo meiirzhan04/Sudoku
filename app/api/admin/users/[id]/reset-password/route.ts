@@ -1,14 +1,6 @@
 import { NextResponse } from "next/server";
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
-  return proxyAdminWrite(request, params.id, "PUT");
-}
-
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-  return proxyAdminWrite(request, params.id, "DELETE");
-}
-
-async function proxyAdminWrite(request: Request, id: string, method: "PUT" | "DELETE") {
+export async function POST(request: Request, { params }: { params: { id: string } }) {
   const { origin } = new URL(request.url);
   const me = await fetch(`${origin}/api/users/me`, {
     headers: forwardHeaders(request),
@@ -22,15 +14,15 @@ async function proxyAdminWrite(request: Request, id: string, method: "PUT" | "DE
   const backend = backendBase(request);
   if (!backend) {
     return NextResponse.json(
-      { message: "Player controls are read-only until BACKEND_URL points to the updated backend admin API." },
+      { message: "Password reset is read-only until BACKEND_URL points to the updated backend admin API." },
       { status: 503 }
     );
   }
 
-  const response = await fetch(`${backend}/api/admin/users/${id}`, {
-    method,
+  const response = await fetch(`${backend}/api/admin/users/${params.id}/reset-password`, {
+    method: "POST",
     headers: forwardHeaders(request, true),
-    body: method === "PUT" ? await request.text() : undefined,
+    body: await request.text(),
     cache: "no-store"
   });
 

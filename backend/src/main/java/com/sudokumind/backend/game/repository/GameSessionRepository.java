@@ -4,6 +4,7 @@ import com.sudokumind.backend.common.enums.GameStatus;
 import com.sudokumind.backend.common.enums.Difficulty;
 import com.sudokumind.backend.game.entity.GameSession;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.math.BigDecimal;
@@ -44,4 +45,8 @@ public interface GameSessionRepository extends JpaRepository<GameSession, UUID> 
 
     @Query("select coalesce(g.user.city, 'Global'), count(g) from GameSession g where g.updatedAt >= :since and g.user is not null group by coalesce(g.user.city, 'Global') order by count(g) desc")
     List<Object[]> activeCitiesSince(Instant since);
+
+    @Modifying
+    @Query("update GameSession g set g.user = null where g.user.id = :userId")
+    void detachUser(UUID userId);
 }

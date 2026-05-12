@@ -41,6 +41,31 @@ export async function GET(request: Request) {
   });
 }
 
+export async function POST(request: Request) {
+  const adminError = await verifyAdmin(request);
+  if (adminError) return adminError;
+
+  const adminBackend = backendBase(request);
+  if (!adminBackend) {
+    return NextResponse.json(
+      { message: "User creation is unavailable until BACKEND_URL points to the updated backend admin API." },
+      { status: 503 }
+    );
+  }
+
+  const response = await fetch(`${adminBackend}/api/admin/users`, {
+    method: "POST",
+    headers: forwardHeaders(request, true),
+    body: await request.text(),
+    cache: "no-store"
+  });
+
+  return new NextResponse(await response.text(), {
+    status: response.status,
+    headers: { "content-type": response.headers.get("content-type") ?? "application/json" }
+  });
+}
+
 function toAdminUser(user: PublicUser) {
   return {
     id: user.id,
@@ -86,7 +111,7 @@ function proxy(url: string, request: Request) {
   });
 }
 
-function forwardHeaders(request: Request) {
+function forwardHeaders(request: Request, json = false) {
   const headers = new Headers();
   const authorization = request.headers.get("authorization");
   const cookie = request.headers.get("cookie");
@@ -94,6 +119,7 @@ function forwardHeaders(request: Request) {
   if (authorization) headers.set("authorization", authorization);
   if (cookie) headers.set("cookie", cookie);
   if (acceptLanguage) headers.set("accept-language", acceptLanguage);
+  if (json) headers.set("content-type", "application/json");
   return headers;
 }
 

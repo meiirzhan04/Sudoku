@@ -2,7 +2,18 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { AlertTriangle, BadgeCheck, Crown, LockKeyhole, Save, Search, Shield, SlidersHorizontal, Trophy, Users, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BadgeCheck, Crown, KeyRound, LockKeyhole, Save, Search, Shield, SlidersHorizontal, Trash2, Trophy, UserPlus, Users, type LucideIcon } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,11 +77,28 @@ type PublicUser = {
 type Draft = {
   fullName: string;
   username: string;
+  email: string;
   city: string;
   role: Role;
   emailVerified: boolean;
   xpOverride: string;
   streakOverride: string;
+};
+
+type CreateDraft = Draft & {
+  password: string;
+};
+
+const emptyCreateDraft: CreateDraft = {
+  fullName: "",
+  username: "",
+  email: "",
+  password: "",
+  city: "",
+  role: "USER",
+  emailVerified: true,
+  xpOverride: "",
+  streakOverride: ""
 };
 
 export default function AdminPage() {
@@ -83,6 +111,11 @@ export default function AdminPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [createDraft, setCreateDraft] = useState<CreateDraft>(emptyCreateDraft);
+  const [newPassword, setNewPassword] = useState("");
   const [loadIssue, setLoadIssue] = useState<LoadIssue | null>(null);
   const [readOnlyMode, setReadOnlyMode] = useState(false);
 
@@ -176,6 +209,7 @@ export default function AdminPage() {
     setDraft({
       fullName: user.fullName,
       username: user.username,
+      email: user.email,
       city: user.city ?? "",
       role: user.role,
       emailVerified: user.emailVerified,
@@ -195,6 +229,7 @@ export default function AdminPage() {
       const response = await apiClient.put<AdminUser>(`/admin/users/${selected.id}`, {
         fullName: draft.fullName,
         username: draft.username,
+        email: draft.email,
         city: draft.city,
         role: draft.role,
         emailVerified: draft.emailVerified,
@@ -208,6 +243,69 @@ export default function AdminPage() {
       toast({ title: "Could not save player", variant: "error" });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function createUser() {
+    if (readOnlyMode || !createDraft.fullName.trim() || !createDraft.username.trim() || !createDraft.email.trim() || createDraft.password.length < 8) {
+      toast({ title: "Fill name, username, email and password first", variant: "info" });
+      return;
+    }
+    setCreating(true);
+    try {
+      const response = await apiClient.post<AdminUser>("/admin/users", {
+        fullName: createDraft.fullName,
+        username: createDraft.username,
+        email: createDraft.email,
+        password: createDraft.password,
+        city: createDraft.city,
+        role: createDraft.role,
+        emailVerified: createDraft.emailVerified,
+        xpOverride: createDraft.xpOverride === "" ? null : Number(createDraft.xpOverride),
+        streakOverride: createDraft.streakOverride === "" ? null : Number(createDraft.streakOverride)
+      });
+      setUsers((current) => [response.data, ...current]);
+      setCreateDraft(emptyCreateDraft);
+      selectUser(response.data);
+      toast({ title: "Player account created", variant: "success" });
+    } catch {
+      toast({ title: "Could not create player", variant: "error" });
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function resetPassword() {
+    if (!selected || !newPassword.trim()) return;
+    setResetting(true);
+    try {
+      const response = await apiClient.post<AdminUser>(`/admin/users/${selected.id}/reset-password`, {
+        password: newPassword.trim()
+      });
+      setUsers((current) => current.map((user) => (user.id === response.data.id ? response.data : user)));
+      selectUser(response.data);
+      setNewPassword("");
+      toast({ title: "Password reset saved", variant: "success" });
+    } catch {
+      toast({ title: "Could not reset password", variant: "error" });
+    } finally {
+      setResetting(false);
+    }
+  }
+
+  async function deleteUser() {
+    if (!selected) return;
+    setDeleting(true);
+    try {
+      await apiClient.delete(`/admin/users/${selected.id}`);
+      setUsers((current) => current.filter((user) => user.id !== selected.id));
+      setSelectedId(undefined);
+      setDraft(null);
+      toast({ title: "User deleted", variant: "success" });
+    } catch {
+      toast({ title: "Could not delete user", variant: "error" });
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -265,6 +363,45 @@ export default function AdminPage() {
           <SummaryCard icon={Trophy} label="Total wins" value={summary.wins} />
           <SummaryCard icon={BadgeCheck} label="Avg accuracy" value={`${summary.accuracy}%`} />
         </section>
+
+        <Card className="bg-card/90 shadow-soft backdrop-blur">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" />
+              Create player
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr_1fr_.8fr_.8fr]">
+            <Input placeholder="Full name" value={createDraft.fullName} disabled={readOnlyMode || creating} onChange={(event) => setCreateDraft({ ...createDraft, fullName: event.target.value })} />
+            <Input placeholder="Username" value={createDraft.username} disabled={readOnlyMode || creating} onChange={(event) => setCreateDraft({ ...createDraft, username: event.target.value })} />
+            <Input type="email" placeholder="Email" value={createDraft.email} disabled={readOnlyMode || creating} onChange={(event) => setCreateDraft({ ...createDraft, email: event.target.value })} />
+            <Input type="password" placeholder="Password" value={createDraft.password} disabled={readOnlyMode || creating} onChange={(event) => setCreateDraft({ ...createDraft, password: event.target.value })} />
+            <Select value={createDraft.role} disabled={readOnlyMode || creating} onValueChange={(value) => setCreateDraft({ ...createDraft, role: value as Role })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="USER">USER</SelectItem>
+                <SelectItem value="PRO">PRO</SelectItem>
+                <SelectItem value="ADMIN">ADMIN</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={createUser} disabled={readOnlyMode || creating}>
+              <UserPlus className="h-4 w-4" />
+              {creating ? "Creating..." : "Create"}
+            </Button>
+            <Input placeholder="City" value={createDraft.city} disabled={readOnlyMode || creating} onChange={(event) => setCreateDraft({ ...createDraft, city: event.target.value })} />
+            <Input type="number" placeholder="XP override" value={createDraft.xpOverride} disabled={readOnlyMode || creating} onChange={(event) => setCreateDraft({ ...createDraft, xpOverride: event.target.value })} />
+            <Input type="number" placeholder="Streak override" value={createDraft.streakOverride} disabled={readOnlyMode || creating} onChange={(event) => setCreateDraft({ ...createDraft, streakOverride: event.target.value })} />
+            <label className="flex min-h-10 items-center gap-2 rounded-md border bg-background/60 px-3 text-sm">
+              <input
+                type="checkbox"
+                checked={createDraft.emailVerified}
+                disabled={readOnlyMode || creating}
+                onChange={(event) => setCreateDraft({ ...createDraft, emailVerified: event.target.checked })}
+              />
+              Email verified
+            </label>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_430px]">
           <Card className="bg-card/90 shadow-soft backdrop-blur">
@@ -345,11 +482,15 @@ export default function AdminPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Full name</Label>
-                      <Input value={draft.fullName} disabled={readOnlyMode} onChange={(event) => setDraft({ ...draft, fullName: event.target.value })} />
+                    <Input value={draft.fullName} disabled={readOnlyMode} onChange={(event) => setDraft({ ...draft, fullName: event.target.value })} />
                   </div>
                   <div className="space-y-2">
                     <Label>Username</Label>
                     <Input value={draft.username} disabled={readOnlyMode} onChange={(event) => setDraft({ ...draft, username: event.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input type="email" value={draft.email} disabled={readOnlyMode} onChange={(event) => setDraft({ ...draft, email: event.target.value })} />
                   </div>
                   <div className="space-y-2">
                     <Label>City</Label>
@@ -391,6 +532,46 @@ export default function AdminPage() {
                     <Save className="h-4 w-4" />
                     {saving ? "Saving..." : "Save player"}
                   </Button>
+                  <div className="rounded-lg border bg-background/60 p-3">
+                    <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                      <KeyRound className="h-4 w-4 text-primary" />
+                      Reset password
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Input
+                        value={newPassword}
+                        disabled={readOnlyMode}
+                        type="password"
+                        placeholder="New password, min 8 chars"
+                        onChange={(event) => setNewPassword(event.target.value)}
+                      />
+                      <Button variant="outline" onClick={resetPassword} disabled={readOnlyMode || resetting || newPassword.trim().length < 8}>
+                        {resetting ? "Resetting..." : "Reset"}
+                      </Button>
+                    </div>
+                  </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" className="w-full" disabled={readOnlyMode || deleting || selected.id === currentUser?.id}>
+                        <Trash2 className="h-4 w-4" />
+                        Delete user
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete {selected.username}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This permanently removes the user account and related social data. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={deleteUser}>
+                          {deleting ? "Deleting..." : "Delete"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </>
               )}
             </CardContent>

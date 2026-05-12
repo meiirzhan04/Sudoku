@@ -15,6 +15,7 @@ dist/
 
 # logs
 *.log
+*.err
 dev.err
 dev.log
 dev3100.err

@@ -28,6 +28,7 @@ public class MultiplayerMove {
 
     private int rowIndex;
     private int colIndex;
+    @Column(name = "\"value\"")
     private int value;
     @Column(name = "is_correct")
     private boolean isCorrect;
