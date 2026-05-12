@@ -48,6 +48,21 @@ type AdminUser = {
   updatedAt: string;
 };
 
+type PublicUser = {
+  id: string;
+  fullName?: string | null;
+  username: string;
+  city?: string | null;
+  role?: Role;
+  stats?: {
+    gamesPlayed?: number;
+    wins?: number;
+    bestTimeSeconds?: number | null;
+    averageAccuracy?: number | null;
+    bestStreak?: number;
+  };
+};
+
 type Draft = {
   fullName: string;
   username: string;
@@ -110,6 +125,18 @@ export default function AdminPage() {
             setAccess("forbidden");
             return;
           }
+          const fallback = await loadPublicUsersFallback(query, controller.signal);
+          if (controller.signal.aborted) return;
+          if (fallback) {
+            setReadOnlyMode(true);
+            setLoadIssue(null);
+            setUsers(fallback);
+            const stillSelected = fallback.find((user) => user.id === selectedId);
+            const nextSelected = stillSelected ?? fallback[0];
+            if (nextSelected) selectUser(nextSelected);
+            return;
+          }
+
           setUsers([]);
           setSelectedId(undefined);
           setDraft(null);
@@ -257,9 +284,9 @@ export default function AdminPage() {
               ) : null}
               {readOnlyMode ? (
                 <div className="rounded-lg border border-primary/30 bg-primary/10 p-4 text-sm">
-                  <div className="font-medium">Showing users in compatibility mode</div>
+                  <div className="font-medium">Compatibility mode</div>
                   <p className="mt-1 leading-6 text-muted-foreground">
-                    The production backend admin API is still updating. User search works now; XP, streak, role and email controls will unlock automatically when the backend endpoint is live.
+                    Users are visible now. Editing XP, streak, roles and email status will unlock automatically when the backend admin API is live.
                   </p>
                 </div>
               ) : null}
@@ -426,6 +453,36 @@ function Mini({ label, value }: { label: string; value: string | number }) {
       <div className="mt-1 font-mono text-lg font-semibold">{value}</div>
     </div>
   );
+}
+
+async function loadPublicUsersFallback(query: string, signal: AbortSignal) {
+  try {
+    const response = await apiClient.get<PublicUser[]>(`/users/search?username=${encodeURIComponent(query)}`, { signal });
+    return response.data.map(toAdminUser);
+  } catch {
+    return null;
+  }
+}
+
+function toAdminUser(user: PublicUser): AdminUser {
+  return {
+    id: user.id,
+    fullName: user.fullName ?? user.username,
+    username: user.username,
+    email: "Read-only until admin API is live",
+    city: user.city ?? null,
+    role: user.role ?? "USER",
+    emailVerified: false,
+    gamesPlayed: user.stats?.gamesPlayed ?? 0,
+    wins: user.stats?.wins ?? 0,
+    bestTimeSeconds: user.stats?.bestTimeSeconds ?? null,
+    averageAccuracy: Number(user.stats?.averageAccuracy ?? 0),
+    currentStreak: user.stats?.bestStreak ?? 0,
+    xp: (user.stats?.wins ?? 0) * 50,
+    xpOverride: null,
+    streakOverride: null,
+    updatedAt: new Date().toISOString()
+  };
 }
 
 function readAdminIssue(error: any): LoadIssue {
