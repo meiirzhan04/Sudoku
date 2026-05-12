@@ -69,6 +69,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadIssue, setLoadIssue] = useState<LoadIssue | null>(null);
+  const [readOnlyMode, setReadOnlyMode] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -97,6 +98,7 @@ export default function AdminPage() {
         setLoadIssue(null);
         try {
           const response = await apiClient.get<AdminUser[]>(`/admin/users${query ? `?q=${encodeURIComponent(query)}` : ""}`, { signal: controller.signal });
+          setReadOnlyMode(response.headers["x-sudokumind-admin-source"] === "public-search");
           setUsers(response.data);
 
           const stillSelected = response.data.find((user) => user.id === selectedId);
@@ -111,6 +113,7 @@ export default function AdminPage() {
           setUsers([]);
           setSelectedId(undefined);
           setDraft(null);
+          setReadOnlyMode(false);
           setLoadIssue(readAdminIssue(error));
         }
       } catch (error: any) {
@@ -156,6 +159,10 @@ export default function AdminPage() {
 
   async function saveUser() {
     if (!selected || !draft) return;
+    if (readOnlyMode) {
+      toast({ title: "Full player controls will unlock after the backend admin API redeploys.", variant: "info" });
+      return;
+    }
     setSaving(true);
     try {
       const response = await apiClient.put<AdminUser>(`/admin/users/${selected.id}`, {
@@ -248,6 +255,14 @@ export default function AdminPage() {
                   <p className="mt-3 text-xs text-primary">{loadIssue.action}</p>
                 </div>
               ) : null}
+              {readOnlyMode ? (
+                <div className="rounded-lg border border-primary/30 bg-primary/10 p-4 text-sm">
+                  <div className="font-medium">Showing users in compatibility mode</div>
+                  <p className="mt-1 leading-6 text-muted-foreground">
+                    The production backend admin API is still updating. User search works now; XP, streak, role and email controls will unlock automatically when the backend endpoint is live.
+                  </p>
+                </div>
+              ) : null}
               {loading ? <div className="skeleton h-40" /> : null}
               {!loading && users.length === 0 && !loadIssue ? (
                 <div className="rounded-lg border bg-background/60 p-4 text-sm text-muted-foreground">No users found.</div>
@@ -303,20 +318,20 @@ export default function AdminPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Full name</Label>
-                    <Input value={draft.fullName} onChange={(event) => setDraft({ ...draft, fullName: event.target.value })} />
+                      <Input value={draft.fullName} disabled={readOnlyMode} onChange={(event) => setDraft({ ...draft, fullName: event.target.value })} />
                   </div>
                   <div className="space-y-2">
                     <Label>Username</Label>
-                    <Input value={draft.username} onChange={(event) => setDraft({ ...draft, username: event.target.value })} />
+                    <Input value={draft.username} disabled={readOnlyMode} onChange={(event) => setDraft({ ...draft, username: event.target.value })} />
                   </div>
                   <div className="space-y-2">
                     <Label>City</Label>
-                    <Input value={draft.city} onChange={(event) => setDraft({ ...draft, city: event.target.value })} />
+                    <Input value={draft.city} disabled={readOnlyMode} onChange={(event) => setDraft({ ...draft, city: event.target.value })} />
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Role</Label>
-                      <Select value={draft.role} onValueChange={(value) => setDraft({ ...draft, role: value as Role })}>
+                      <Select value={draft.role} disabled={readOnlyMode} onValueChange={(value) => setDraft({ ...draft, role: value as Role })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="USER">USER</SelectItem>
@@ -329,6 +344,7 @@ export default function AdminPage() {
                       <input
                         type="checkbox"
                         checked={draft.emailVerified}
+                        disabled={readOnlyMode}
                         onChange={(event) => setDraft({ ...draft, emailVerified: event.target.checked })}
                       />
                       Email verified
@@ -337,14 +353,14 @@ export default function AdminPage() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label>XP override</Label>
-                      <Input type="number" value={draft.xpOverride} placeholder={`${selected.xp}`} onChange={(event) => setDraft({ ...draft, xpOverride: event.target.value })} />
+                      <Input type="number" value={draft.xpOverride} disabled={readOnlyMode} placeholder={`${selected.xp}`} onChange={(event) => setDraft({ ...draft, xpOverride: event.target.value })} />
                     </div>
                     <div className="space-y-2">
                       <Label>Streak override</Label>
-                      <Input type="number" value={draft.streakOverride} placeholder={`${selected.currentStreak}`} onChange={(event) => setDraft({ ...draft, streakOverride: event.target.value })} />
+                      <Input type="number" value={draft.streakOverride} disabled={readOnlyMode} placeholder={`${selected.currentStreak}`} onChange={(event) => setDraft({ ...draft, streakOverride: event.target.value })} />
                     </div>
                   </div>
-                  <Button className="w-full" onClick={saveUser} disabled={saving}>
+                  <Button className="w-full" onClick={saveUser} disabled={saving || readOnlyMode}>
                     <Save className="h-4 w-4" />
                     {saving ? "Saving..." : "Save player"}
                   </Button>
