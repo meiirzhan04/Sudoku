@@ -44,6 +44,7 @@ public class GameInviteService {
         return toResponse(inviteRepository.save(invite));
     }
 
+    @Transactional(readOnly = true)
     public List<GameInviteResponse> incoming(UUID userId) {
         return inviteRepository.findByReceiverIdAndStatusOrderByCreatedAtDesc(userId, InviteStatus.PENDING).stream().map(this::toResponse).toList();
     }

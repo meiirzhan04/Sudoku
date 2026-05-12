@@ -184,11 +184,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (!user || isAdminRoute) return;
     const refresh = () => void loadFriendRequests(true);
     void loadFriendRequests(false);
-    const timer = window.setInterval(refresh, 30000);
+    const timer = window.setInterval(refresh, 5000);
     window.addEventListener("focus", refresh);
+    window.addEventListener("sudokumind-friend-requests-updated", refresh);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener("focus", refresh);
+      window.removeEventListener("sudokumind-friend-requests-updated", refresh);
     };
   }, [isAdminRoute, loadFriendRequests, user]);
 

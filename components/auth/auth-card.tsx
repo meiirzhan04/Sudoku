@@ -124,7 +124,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
     const email = String(form.get("email") ?? "");
     const password = String(form.get("password") ?? "");
 
-    if (!validPassword(password)) {
+    if (isRegister && !validPassword(password)) {
       setError(t("auth.weakPassword"));
       setPending(false);
       return;
@@ -288,18 +288,20 @@ export function AuthCard({ mode }: { mode: Mode }) {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              <div className="space-y-1">
-                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={[
-                      "h-full rounded-full transition-all",
-                      passwordScore.score <= 1 ? "bg-destructive" : passwordScore.score === 2 ? "bg-amber-400" : "bg-primary"
-                    ].join(" ")}
-                    style={{ width: `${passwordScore.score * 25}%` }}
-                  />
+              {values.password ? (
+                <div className="space-y-1">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={[
+                        "h-full rounded-full transition-all",
+                        passwordScore.score <= 1 ? "bg-destructive" : passwordScore.score === 2 ? "bg-amber-400" : "bg-primary"
+                      ].join(" ")}
+                      style={{ width: `${passwordScore.score * 25}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">{passwordScore.label}</p>
                 </div>
-                {values.password ? <p className="text-xs text-muted-foreground">{passwordScore.label}</p> : null}
-              </div>
+              ) : null}
             </div>
 
             {isRegister ? (

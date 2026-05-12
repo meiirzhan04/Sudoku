@@ -55,10 +55,12 @@ public class FriendService {
         return toResponse(requestRepository.save(friendRequest));
     }
 
+    @Transactional(readOnly = true)
     public List<FriendRequestResponse> incoming(UUID userId) {
         return requestRepository.findByReceiverIdAndStatusOrderByCreatedAtDesc(userId, FriendRequestStatus.PENDING).stream().map(this::toResponse).toList();
     }
 
+    @Transactional(readOnly = true)
     public List<FriendRequestResponse> outgoing(UUID userId) {
         return requestRepository.findBySenderIdAndStatusOrderByCreatedAtDesc(userId, FriendRequestStatus.PENDING).stream().map(this::toResponse).toList();
     }
@@ -81,6 +83,7 @@ public class FriendService {
         return toResponse(requestRepository.save(request));
     }
 
+    @Transactional(readOnly = true)
     public List<FriendResponse> friends(UUID userId) {
         Instant onlineSince = Instant.now().minusSeconds(300);
         return friendRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()

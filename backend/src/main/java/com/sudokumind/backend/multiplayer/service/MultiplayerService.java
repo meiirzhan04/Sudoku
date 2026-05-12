@@ -78,10 +78,12 @@ public class MultiplayerService {
         return room(room.getId(), userId);
     }
 
+    @Transactional(readOnly = true)
     public RoomResponse room(UUID roomId) {
         return room(roomId, null);
     }
 
+    @Transactional(readOnly = true)
     public RoomResponse room(UUID roomId, UUID viewerId) {
         MultiplayerRoom room = require(roomId);
         int[][] currentBoard = viewerId == null

@@ -145,16 +145,16 @@ export function BattleClient() {
 
   const loadFriends = useCallback(async () => {
     if (!hasAuthToken()) return;
-    const [friendsResponse, incomingResponse, gameInvitesResponse, onlineResponse] = await Promise.all([
+    const [friendsResponse, incomingResponse, gameInvitesResponse, onlineResponse] = await Promise.allSettled([
       apiClient.get<FriendResponse[]>("/friends"),
       apiClient.get<FriendRequestResponse[]>("/friends/requests/incoming"),
       apiClient.get<GameInviteResponse[]>("/game-invites/incoming"),
       apiClient.get<OnlinePlayer[]>("/stats/players/online")
     ]);
-    setFriends(friendsResponse.data);
-    setIncoming(incomingResponse.data);
-    setGameInvites(gameInvitesResponse.data);
-    setOnlinePlayers(onlineResponse.data);
+    if (friendsResponse.status === "fulfilled") setFriends(friendsResponse.value.data);
+    if (incomingResponse.status === "fulfilled") setIncoming(incomingResponse.value.data);
+    if (gameInvitesResponse.status === "fulfilled") setGameInvites(gameInvitesResponse.value.data);
+    if (onlineResponse.status === "fulfilled") setOnlinePlayers(onlineResponse.value.data);
   }, []);
 
   const refreshRoom = useCallback(async () => {
@@ -254,8 +254,8 @@ export function BattleClient() {
       setEntries(cloneBoard(roomResponse.data.currentBoard));
       setElapsed(0);
       setStage("lobby");
-    } catch {
-      toast({ title: "Сессия не подтверждена. Войди ещё раз и попробуй создать комнату.", variant: "info" });
+    } catch (error) {
+      toast({ title: `Не удалось создать комнату: ${readApiError(error)}`, variant: "error" });
     } finally {
       setBusy(false);
     }
@@ -322,9 +322,10 @@ export function BattleClient() {
       toast({ title: "Заявка в друзья отправлена", variant: "success" });
       setFriendQuery("");
       setFriendSuggestions([]);
+      window.dispatchEvent(new Event("sudokumind-friend-requests-updated"));
       await loadFriends();
-    } catch {
-      toast({ title: "Пользователь не найден или заявка уже отправлена", variant: "info" });
+    } catch (error) {
+      toast({ title: `Не удалось отправить заявку: ${readApiError(error)}`, variant: "error" });
     }
   }
 
@@ -835,4 +836,18 @@ function labelMode(value: string) {
   if (value === "HARDCORE") return "Хардкор";
   if (value === "TIME_ATTACK") return "На время";
   return "Классика";
+}
+
+function readApiError(error: unknown) {
+  if (typeof error === "object" && error && "response" in error) {
+    const response = (error as { response?: { status?: number; data?: { message?: string; error?: string } } }).response;
+    if (response?.data?.message) return response.data.message;
+    if (response?.data?.error) return response.data.error;
+    if (response?.status === 401) return "войди заново";
+    if (response?.status === 403) return "нет доступа для этого аккаунта";
+    if (response?.status === 404) return "backend endpoint не найден";
+    if (response?.status === 409) return "заявка уже есть или вы уже друзья";
+    if (response?.status && response.status >= 500) return "ошибка backend, попробуй ещё раз";
+  }
+  return "проверь соединение и backend";
 }
