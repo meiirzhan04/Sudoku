@@ -13,6 +13,7 @@ import com.sudokumind.backend.user.service.UserService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -32,10 +33,10 @@ public class AdminService {
         String normalized = query == null ? "" : query.trim().toLowerCase();
         return userRepository.findAll().stream()
                 .filter(user -> normalized.isBlank()
-                        || user.getUsername().toLowerCase().contains(normalized)
-                        || user.getEmail().toLowerCase().contains(normalized)
-                        || user.getFullName().toLowerCase().contains(normalized))
-                .sorted(Comparator.comparing(User::getUpdatedAt).reversed())
+                        || contains(user.getUsername(), normalized)
+                        || contains(user.getEmail(), normalized)
+                        || contains(user.getFullName(), normalized))
+                .sorted(Comparator.comparing(this::updatedAtOrEpoch).reversed())
                 .map(this::toResponse)
                 .toList();
     }
@@ -59,6 +60,14 @@ public class AdminService {
         if (admin.getRole() != UserRole.ADMIN) {
             throw new ApiException(ErrorCode.ACCESS_DENIED);
         }
+    }
+
+    private boolean contains(String value, String query) {
+        return value != null && value.toLowerCase().contains(query);
+    }
+
+    private Instant updatedAtOrEpoch(User user) {
+        return user.getUpdatedAt() == null ? Instant.EPOCH : user.getUpdatedAt();
     }
 
     private AdminUserResponse toResponse(User user) {

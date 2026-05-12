@@ -63,6 +63,7 @@ export default function AdminPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -88,16 +89,30 @@ export default function AdminPage() {
         }
 
         setAccess("allowed");
-        const response = await apiClient.get<AdminUser[]>(`/admin/users${query ? `?q=${encodeURIComponent(query)}` : ""}`, { signal: controller.signal });
-        setUsers(response.data);
+        setLoadError("");
+        try {
+          const response = await apiClient.get<AdminUser[]>(`/admin/users${query ? `?q=${encodeURIComponent(query)}` : ""}`, { signal: controller.signal });
+          setUsers(response.data);
 
-        const stillSelected = response.data.find((user) => user.id === selectedId);
-        const nextSelected = stillSelected ?? response.data[0];
-        if (nextSelected) selectUser(nextSelected);
+          const stillSelected = response.data.find((user) => user.id === selectedId);
+          const nextSelected = stillSelected ?? response.data[0];
+          if (nextSelected) selectUser(nextSelected);
+        } catch (error: any) {
+          if (controller.signal.aborted) return;
+          if (error?.response?.status === 403) {
+            setAccess("forbidden");
+            return;
+          }
+          setUsers([]);
+          setSelectedId(undefined);
+          setDraft(null);
+          setLoadError(readAdminError(error));
+          toast({ title: readAdminError(error), variant: "error" });
+        }
       } catch (error: any) {
         if (controller.signal.aborted) return;
         setAccess(error?.response?.status === 403 ? "forbidden" : "login");
-        toast({ title: "Admin access check failed", variant: "error" });
+        toast({ title: error?.response?.status === 401 ? "Admin sign in required" : "Could not verify admin session", variant: "error" });
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -222,8 +237,13 @@ export default function AdminPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
+              {loadError ? (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+                  {loadError}
+                </div>
+              ) : null}
               {loading ? <div className="skeleton h-40" /> : null}
-              {!loading && users.length === 0 ? (
+              {!loading && users.length === 0 && !loadError ? (
                 <div className="rounded-lg border bg-background/60 p-4 text-sm text-muted-foreground">No users found.</div>
               ) : null}
               {users.map((user) => (
@@ -384,4 +404,13 @@ function Mini({ label, value }: { label: string; value: string | number }) {
       <div className="mt-1 font-mono text-lg font-semibold">{value}</div>
     </div>
   );
+}
+
+function readAdminError(error: any) {
+  const status = error?.response?.status;
+  const message = error?.response?.data?.message ?? error?.response?.data?.error;
+  if (message) return String(message);
+  if (status === 404) return "Admin API is not available on this backend deployment yet.";
+  if (status === 500) return "Admin users could not be loaded. Check backend logs.";
+  return "Admin data could not be loaded.";
 }
