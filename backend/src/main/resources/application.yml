@@ -31,6 +31,8 @@ app:
   admin:
     emails: ${ADMIN_EMAILS:}
     usernames: ${ADMIN_USERNAMES:}
+    demo-email: ${ADMIN_DEMO_EMAIL:admin@gmail.com}
+    demo-password: ${ADMIN_DEMO_PASSWORD:admin123123}
   jwt:
     secret: ${JWT_SECRET:replace-this-with-a-very-long-256-bit-secret-for-local-dev-only}
     access-token-minutes: 15

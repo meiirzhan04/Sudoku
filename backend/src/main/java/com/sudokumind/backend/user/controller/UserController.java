@@ -28,6 +28,11 @@ public class UserController {
         userService.heartbeat(CurrentUser.id());
     }
 
+    @PostMapping("/me/pro-preview")
+    public UserResponse activateProPreview() {
+        return userService.activateProPreview(CurrentUser.id());
+    }
+
     @GetMapping("/me/dashboard")
     public DashboardResponse dashboard() {
         return userService.dashboard(CurrentUser.id());

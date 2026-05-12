@@ -18,6 +18,9 @@ type Mode = "login" | "register";
 type LoginResponse = {
   accessToken: string;
   refreshToken: string;
+  user?: {
+    role?: "USER" | "PRO" | "ADMIN";
+  };
 };
 
 const authCopy: Record<Locale, { creating: string; entering: string; hidePassword: string; showPassword: string; weak: string; medium: string; strong: string; failed: string }> = {
@@ -130,16 +133,16 @@ export function AuthCard({ mode }: { mode: Mode }) {
     try {
       if (mode === "register") {
         await register(form, email, password);
-        await login(form, email, password);
+        const data = await login(form, email, password);
         setSuccess(true);
         toast({ title: t("common.success"), variant: "success" });
-        window.setTimeout(() => router.push("/dashboard"), 280);
+        window.setTimeout(() => router.push(data.user?.role === "ADMIN" ? "/admin" : "/dashboard"), 280);
         router.refresh();
       } else {
-        await login(form, email, password);
+        const data = await login(form, email, password);
         setSuccess(true);
         toast({ title: t("auth.signIn"), variant: "success" });
-        window.setTimeout(() => router.push(searchParams.get("next") ?? "/dashboard"), 220);
+        window.setTimeout(() => router.push(searchParams.get("next") ?? (data.user?.role === "ADMIN" ? "/admin" : "/dashboard")), 220);
         router.refresh();
       }
     } catch (caught) {
@@ -201,6 +204,7 @@ export function AuthCard({ mode }: { mode: Mode }) {
     document.cookie = `sm_access_token=${data.accessToken}; path=/; max-age=${
       rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24
     }; SameSite=Lax`;
+    return data;
   }
 
   function google() {

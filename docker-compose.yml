@@ -34,6 +34,8 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
+      ADMIN_DEMO_EMAIL: ${ADMIN_DEMO_EMAIL:-admin@gmail.com}
+      ADMIN_DEMO_PASSWORD: ${ADMIN_DEMO_PASSWORD:-admin123123}
     ports:
       - "8080:8080"
 

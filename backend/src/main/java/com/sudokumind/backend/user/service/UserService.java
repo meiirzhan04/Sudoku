@@ -50,6 +50,15 @@ public class UserService {
     }
 
     @Transactional
+    public UserResponse activateProPreview(UUID id) {
+        User user = require(id);
+        if (user.getRole() != UserRole.ADMIN) {
+            user.setRole(UserRole.PRO);
+        }
+        return userMapper.toResponse(userRepository.save(user), stats(id));
+    }
+
+    @Transactional
     public void heartbeat(UUID id) {
         User user = require(id);
         user.setLastSeenAt(Instant.now());

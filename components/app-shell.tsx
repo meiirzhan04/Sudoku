@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Crown, Gamepad2, Globe2, Home, LogOut, Moon, Settings, Shield, SunMedium, UserRound } from "lucide-react";
+import { Bell, Check, Crown, Gamepad2, Globe2, Home, LogOut, Moon, Settings, Shield, SunMedium, UserPlus, UserRound, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -18,6 +18,7 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { useLanguage } from "@/components/providers/language-provider";
+import { useToast } from "@/components/ui/toast";
 import { Locale, locales } from "@/lib/i18n/messages";
 import { initials } from "@/lib/utils";
 
@@ -28,6 +29,15 @@ type SessionUser = {
   email: string;
   avatarUrl?: string | null;
   role: "USER" | "ADMIN" | "PRO";
+};
+
+type FriendRequest = {
+  id: string;
+  sender: {
+    username: string;
+    fullName: string;
+    avatarUrl?: string | null;
+  };
 };
 
 const languageNames: Record<Locale, string> = {
@@ -65,6 +75,7 @@ const navCopy: Record<Locale, { battle: string; leaderboard: string; pricing: st
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { locale, setLocale, t } = useLanguage();
+  const { toast } = useToast();
   const nav = navCopy[locale];
   const pathname = usePathname();
   const router = useRouter();
@@ -72,7 +83,33 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+  const [lastRequestCount, setLastRequestCount] = useState(0);
   const isAdminRoute = pathname?.startsWith("/admin");
+
+  const loadFriendRequests = useCallback(async (announce = false) => {
+    const token = window.localStorage.getItem("sudokumind-access-token");
+    if (!token) {
+      setFriendRequests([]);
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/friends/requests/incoming", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) return;
+      const requests = (await response.json()) as FriendRequest[];
+      setFriendRequests(requests);
+      if (announce && requests.length > lastRequestCount) {
+        toast({ title: `Новая заявка в друзья от ${requests[0]?.sender.username ?? "игрока"}`, variant: "info" });
+      }
+      setLastRequestCount(requests.length);
+    } catch {
+      // Notifications are best-effort; the rest of the app should stay quiet.
+    }
+  }, [lastRequestCount, toast]);
 
   const loadUser = useCallback(() => {
     const token = window.localStorage.getItem("sudokumind-access-token");
@@ -142,6 +179,29 @@ export function AppShell({ children }: { children: ReactNode }) {
       window.removeEventListener("focus", heartbeat);
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!user || isAdminRoute) return;
+    const refresh = () => void loadFriendRequests(true);
+    void loadFriendRequests(false);
+    const timer = window.setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [isAdminRoute, loadFriendRequests, user]);
+
+  async function answerFriendRequest(id: string, action: "accept" | "decline") {
+    const token = window.localStorage.getItem("sudokumind-access-token");
+    if (!token) return;
+    await fetch(`/api/friends/requests/${id}/${action}`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}` }
+    }).catch(() => undefined);
+    toast({ title: action === "accept" ? "Друг добавлен" : "Заявка отклонена", variant: action === "accept" ? "success" : "info" });
+    await loadFriendRequests(false);
+  }
 
   function signOut() {
     window.localStorage.removeItem("sudokumind-access-token");
@@ -257,6 +317,56 @@ export function AppShell({ children }: { children: ReactNode }) {
 
             {!authChecked ? null : user ? (
               <div className="relative flex items-center gap-2">
+                <div className="relative">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Friend requests"
+                    onClick={() => setNotificationsOpen((value) => !value)}
+                  >
+                    <Bell className="h-4 w-4" />
+                    {friendRequests.length ? (
+                      <span className="absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                        {friendRequests.length}
+                      </span>
+                    ) : null}
+                  </Button>
+                  {notificationsOpen ? (
+                    <div className="absolute end-0 top-11 z-50 w-80 overflow-hidden rounded-lg border bg-card p-2 text-sm shadow-soft">
+                      <div className="flex items-center gap-2 px-2 py-2 font-semibold">
+                        <UserPlus className="h-4 w-4 text-primary" />
+                        Заявки в друзья
+                      </div>
+                      {friendRequests.length === 0 ? (
+                        <div className="rounded-md bg-muted/40 px-3 py-3 text-muted-foreground">Новых заявок пока нет.</div>
+                      ) : null}
+                      <div className="space-y-2">
+                        {friendRequests.map((request) => (
+                          <div key={request.id} className="flex items-center justify-between gap-3 rounded-md border bg-background/70 p-2">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={request.sender.avatarUrl ?? undefined} />
+                                <AvatarFallback>{initials(request.sender.username)}</AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <div className="truncate font-medium">{request.sender.username}</div>
+                                <div className="truncate text-xs text-muted-foreground">{request.sender.fullName}</div>
+                              </div>
+                            </div>
+                            <div className="flex gap-1">
+                              <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => void answerFriendRequest(request.id, "accept")}>
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => void answerFriendRequest(request.id, "decline")}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
                 <button type="button" className="relative" onClick={() => setProfileOpen((value) => !value)} aria-label={nav.profile}>
                   <Avatar className="h-9 w-9 border">
                     <AvatarImage src={user.avatarUrl ?? undefined} />
