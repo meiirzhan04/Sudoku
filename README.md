@@ -164,6 +164,7 @@ Frontend `.env`:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8080
+BACKEND_URL=http://localhost:8080
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ANTHROPIC_API_KEY=
 ```
@@ -183,7 +184,7 @@ ANTHROPIC_API_KEY=
 
 Production:
 
-- Vercel `NEXT_PUBLIC_API_URL` should point to Render backend.
+- Vercel `NEXT_PUBLIC_API_URL` or `BACKEND_URL` should point to the Render backend.
 - Render `FRONTEND_URL` should point to the Vercel production domain.
 - Google OAuth redirect URI should be:
 

@@ -15,6 +15,11 @@ import { formatSeconds } from "@/lib/utils";
 
 type Role = "USER" | "ADMIN" | "PRO";
 type AccessState = "checking" | "login" | "forbidden" | "allowed";
+type LoadIssue = {
+  title: string;
+  description: string;
+  action: string;
+};
 
 type SessionUser = {
   id: string;
@@ -63,7 +68,7 @@ export default function AdminPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [loadError, setLoadError] = useState("");
+  const [loadIssue, setLoadIssue] = useState<LoadIssue | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -89,7 +94,7 @@ export default function AdminPage() {
         }
 
         setAccess("allowed");
-        setLoadError("");
+        setLoadIssue(null);
         try {
           const response = await apiClient.get<AdminUser[]>(`/admin/users${query ? `?q=${encodeURIComponent(query)}` : ""}`, { signal: controller.signal });
           setUsers(response.data);
@@ -106,8 +111,7 @@ export default function AdminPage() {
           setUsers([]);
           setSelectedId(undefined);
           setDraft(null);
-          setLoadError(readAdminError(error));
-          toast({ title: readAdminError(error), variant: "error" });
+          setLoadIssue(readAdminIssue(error));
         }
       } catch (error: any) {
         if (controller.signal.aborted) return;
@@ -237,13 +241,15 @@ export default function AdminPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {loadError ? (
-                <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-                  {loadError}
+              {loadIssue ? (
+                <div className="rounded-lg border bg-background/60 p-4 text-sm">
+                  <div className="font-medium">{loadIssue.title}</div>
+                  <p className="mt-1 leading-6 text-muted-foreground">{loadIssue.description}</p>
+                  <p className="mt-3 text-xs text-primary">{loadIssue.action}</p>
                 </div>
               ) : null}
               {loading ? <div className="skeleton h-40" /> : null}
-              {!loading && users.length === 0 && !loadError ? (
+              {!loading && users.length === 0 && !loadIssue ? (
                 <div className="rounded-lg border bg-background/60 p-4 text-sm text-muted-foreground">No users found.</div>
               ) : null}
               {users.map((user) => (
@@ -406,11 +412,40 @@ function Mini({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function readAdminError(error: any) {
+function readAdminIssue(error: any): LoadIssue {
   const status = error?.response?.status;
   const message = error?.response?.data?.message ?? error?.response?.data?.error;
-  if (message) return String(message);
-  if (status === 404) return "Admin API is not available on this backend deployment yet.";
-  if (status === 500) return "Admin users could not be loaded. Check backend logs.";
-  return "Admin data could not be loaded.";
+  if (status === 404) {
+    return {
+      title: "Backend deployment is not updated yet",
+      description: "The app is open as ADMIN, but the production backend does not expose /api/admin/users yet. Deploy the latest backend build or set NEXT_PUBLIC_API_URL to the backend that has the admin endpoints.",
+      action: "After the backend redeploy finishes, refresh this page."
+    };
+  }
+  if (status === 401) {
+    return {
+      title: "Admin session expired",
+      description: "Your browser session is no longer accepted by the backend.",
+      action: "Sign out, then sign in again with the admin account."
+    };
+  }
+  if (status === 403) {
+    return {
+      title: "Admin access was rejected",
+      description: "The backend answered, but this token is not accepted for admin data.",
+      action: "Sign in again with admin@gmail.com or check the user role in the database."
+    };
+  }
+  if (status && status >= 500) {
+    return {
+      title: "Backend is starting or unavailable",
+      description: message ? String(message) : "The admin API answered with a server error while loading users.",
+      action: "Refresh in a moment. If it stays here, check backend logs."
+    };
+  }
+  return {
+    title: "Admin data is waiting for backend",
+    description: message ? String(message) : "The app could not reach the backend admin API from this deployment.",
+    action: "Check NEXT_PUBLIC_API_URL / BACKEND_URL and refresh."
+  };
 }
