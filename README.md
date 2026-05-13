@@ -1,297 +1,290 @@
 # SudokuMind
 
-SudokuMind is a modern web platform for playing, learning and competing in Sudoku. It combines classic Sudoku gameplay with daily challenges, AI coaching, leaderboards, personal statistics, Google authentication, premium customization ideas and a competitive friend battle mode.
+SudokuMind is a modern web platform for playing, learning and competing in Sudoku.  
+It combines classic Sudoku gameplay with daily challenges, AI coaching, multiplayer battles, user profiles, leaderboards, admin management and moderation tools.
 
 > Train your brain. One grid at a time.
 
+---
+
 ## Product Idea
 
-SudokuMind turns a simple Sudoku board into a startup-style brain training product. Players can solve generated puzzles, keep progress in their profile, compare daily challenge results, ask an AI Coach for strategy explanations and race friends in Sudoku Battle.
+SudokuMind turns a simple Sudoku board into a full brain-training platform.
 
-The product is built for:
+The main idea of the project is not only to let users solve Sudoku puzzles, but also to help them learn, compete, track progress and build a daily habit.
 
-- Casual Sudoku players who want a polished daily habit.
-- Students and learners who want explanations instead of raw answers.
-- Competitive players who care about time, accuracy and rankings.
-- Demo/recruiting contexts where the app should feel like a real product, not a small exercise.
+The platform is designed for:
+
+- Casual Sudoku players who want a beautiful and simple puzzle experience.
+- Students and beginners who want explanations and hints.
+- Competitive players who want battles, rankings and statistics.
+- Users who want to improve logic thinking and daily focus.
+- Demo, portfolio and hackathon presentations where the project should look like a real product.
+
+SudokuMind is more than a basic Sudoku website.  
+It includes AI learning, friend battles, admin control, blacklist system, user management, achievements, streaks and many other features.
+
+---
 
 ## Key Features
 
-- Premium landing page with SudokuMind branding, dark/light mode and responsive UI.
-- Email/password auth, Google OAuth, JWT sessions and user profiles.
-- Generated Sudoku puzzles with Easy, Medium, Hard, Expert and Insane difficulty.
-- Timer, mistakes, notes mode, undo/redo, hints, pause and autosave.
-- Daily Challenge with shared puzzle, city/global leaderboard and streak-oriented UX.
-- AI Coach architecture with local fallback and Anthropic/OpenAI-ready integration style.
-- Global and city leaderboard mock page for empty-production states.
-- Profile with saved user data, stats and backend game history.
-- Pro/Pricing page with Stripe-ready mock checkout positioning.
-- Sudoku Battle mock realtime mode with rooms, lobby, invite links, ready/start flow, live opponent progress, results, XP, friends and achievements.
+- Modern landing page with SudokuMind branding.
+- Responsive UI for desktop and mobile.
+- Dark and light mode.
+- Email/password authentication.
+- Google OAuth authentication.
+- JWT-based user sessions.
+- User profile with personal information and statistics.
+- Generated Sudoku puzzles.
+- Difficulty levels: Easy, Medium, Hard, Expert and Insane.
+- Timer, mistakes, notes mode, hints and pause.
+- Undo and redo system.
+- Autosave for unfinished games.
+- Daily Challenge system.
+- Streak system for daily habit building.
+- XP, levels and achievements.
+- Global and city leaderboards.
+- AI Coach and AI Teacher.
+- Battle with Friends mode.
+- AI Battle mode.
+- Friends system.
+- Admin Panel.
+- User management.
+- Blacklist system.
+- Reports and moderation.
+- Audit logs for admin actions.
+- Pro/Premium page idea.
+- Stripe-ready monetization idea.
+- Backend-ready architecture with Spring Boot and PostgreSQL.
 
-## Multiplayer Battle Mode
+---
 
-SudokuMind includes a competitive friend battle mode where users can create private rooms, invite friends with a room code, and race to solve the same Sudoku puzzle. The winner is determined by completion time, mistakes and hints used.
+## Main Modules
 
-This feature adds social retention and makes the product more than a simple Sudoku board. It turns Sudoku into a competitive brain-training experience.
+SudokuMind includes several major modules:
 
-Current implementation:
+### 1. Sudoku Game
 
-- Frontend mock realtime room engine stored in `localStorage`.
-- Fake room code and invite link generation.
-- Lobby with host badge, player list, ready status, difficulty and battle mode.
-- Animated `3, 2, 1, Go` countdown.
-- Same Sudoku puzzle for all players.
-- Live progress bars, opponent status, timer, mistakes and hints.
-- Result screen with winner card, ranking table, XP, rematch and share actions.
-- Friends list, add friend by username, invite action, battle history, rank and achievements.
-- Refresh recovery through saved room state.
+The main game module allows users to solve Sudoku puzzles with different difficulty levels.
 
-Realtime-ready data model:
+Game features:
+
+- Number input.
+- Notes mode.
+- Mistake counter.
+- Timer.
+- Hint button.
+- Pause game.
+- Continue saved game.
+- Puzzle validation.
+- Completion screen.
+- Statistics update after finishing.
+
+---
+
+### 2. Daily Challenge
+
+The Daily Challenge gives all users the same puzzle every day.
+
+Daily Challenge features:
+
+- One puzzle per day.
+- Shared leaderboard.
+- Completion time tracking.
+- Mistake tracking.
+- Accuracy calculation.
+- Daily streak update.
+- XP reward.
+- Share streak action.
+
+This helps users return every day and makes the platform more engaging.
+
+---
+
+### 3. Habit & Streak System
+
+SudokuMind includes a streak system that motivates users to keep solving puzzles every day.
+
+The dashboard can show:
+
+- Current streak.
+- Weekly progress.
+- Daily goal.
+- XP progress.
+- Level progress.
+- Streak milestones.
+- Rewards.
+- Streak Freeze for premium users.
+
+Streak milestones:
+
+- 3 days.
+- 7 days.
+- 14 days.
+- 30 days.
+- 100 days.
+
+Guest users can store streak data in localStorage, while registered users can sync progress with the backend.
+
+---
+
+## Battle With Friends
+
+SudokuMind includes a Battle with Friends mode where users can compete with each other in real time.
+
+Players can:
+
+- Create a private battle room.
+- Invite friends using a room code.
+- Invite friends using a shareable link.
+- Choose difficulty level.
+- Choose battle mode.
+- Wait in lobby.
+- Mark themselves as ready.
+- Start the game together.
+- Solve the same Sudoku puzzle.
+- See opponent progress.
+- See opponent mistakes and hints.
+- View final ranking.
+- Start a rematch.
+
+Winner can be calculated by:
+
+- Fastest completion time.
+- Lowest number of mistakes.
+- Lowest number of hints used.
+- Highest accuracy.
+- Custom battle mode rules.
+
+Battle modes:
+
+- 1v1 Race.
+- Group Race.
+- No Mistakes Challenge.
+- Fastest Time Wins.
+- Accuracy Battle.
+- Hard Mode Duel.
+
+This feature turns Sudoku from a solo puzzle into a competitive social experience.
+
+---
+
+## AI Battle Mode
+
+SudokuMind also includes AI Battle mode.
+
+If the user does not have friends online, they can compete against an AI opponent.
+
+AI difficulty levels:
+
+- Easy AI.
+- Medium AI.
+- Hard AI.
+- Expert AI.
+
+AI opponent behavior can include:
+
+- Simulated solving progress.
+- Different solving speeds.
+- Different mistake chances.
+- Different hint usage.
+- Dynamic progress bar.
+- Final result comparison.
+
+AI Battle helps users train and practice anytime.
+
+---
+
+## AI Teacher
+
+SudokuMind includes an AI Teacher that helps users learn Sudoku instead of simply giving answers.
+
+The AI Teacher can:
+
+- Explain why a number belongs in a cell.
+- Explain user mistakes.
+- Give hints without fully solving the puzzle.
+- Teach Sudoku strategies step by step.
+- Answer user questions in natural language.
+- Help beginners understand Sudoku rules.
+- Explain advanced techniques.
+- Act like a personal Sudoku tutor during the game.
+
+Example questions users can ask:
+
+- "Why is 5 correct in this cell?"
+- "What should I check next?"
+- "Give me a hint but do not solve it fully."
+- "Explain this puzzle like I am a beginner."
+- "What mistake did I make?"
+- "Teach me a Sudoku strategy."
+- "How can I solve this row?"
+- "What numbers are possible in this box?"
+
+Possible AI Teacher topics:
+
+- Rows.
+- Columns.
+- 3x3 boxes.
+- Candidates.
+- Hidden singles.
+- Naked singles.
+- Naked pairs.
+- Mistake explanation.
+- Logical deduction.
+
+This makes SudokuMind educational and useful for beginners, not just another puzzle page from the internet swamp.
+
+---
+
+## Admin Panel
+
+SudokuMind includes an Admin Panel for platform management.
+
+Admin Panel sections:
+
+- Dashboard.
+- Users.
+- Roles.
+- Blacklist.
+- Reports.
+- Game Sessions.
+- Battle Rooms.
+- Daily Challenges.
+- AI Logs.
+- Analytics.
+- Settings.
+- Audit Logs.
+
+Admins can:
+
+- View all users.
+- Search users by username or email.
+- Add users.
+- Edit users.
+- Delete users.
+- Change user roles.
+- Block users.
+- Unblock users.
+- Add users to blacklist.
+- Remove users from blacklist.
+- View user game history.
+- View battle history.
+- View reports.
+- Review suspicious accounts.
+- Manage leaderboard data.
+- View AI Teacher usage logs.
+- View platform analytics.
+
+The Admin Panel makes the project look like a real production platform, not just a lonely Sudoku board floating in browser space.
+
+---
+
+## User Management
+
+SudokuMind supports full user management.
+
+User roles:
 
 ```ts
-rooms: {
-  id: string
-  roomCode: string
-  hostId: string
-  difficulty: "easy" | "medium" | "hard" | "expert" | "insane"
-  mode: "1v1 Race" | "Group Race" | "No Mistakes Challenge" | "Fastest Time Wins"
-  status: "waiting" | "playing" | "finished"
-  puzzle: number[][]
-  solution: number[][]
-  createdAt: string
-  startedAt?: string
-  finishedAt?: string
-}
-
-roomPlayers: {
-  roomId: string
-  userId: string
-  username: string
-  avatarUrl?: string
-  city: string
-  isHost: boolean
-  isReady: boolean
-  progress: number
-  mistakes: number
-  hintsUsed: number
-  finishTime?: number
-  status: "online" | "playing" | "finished" | "disconnected"
-}
-
-moves: {
-  roomId: string
-  userId: string
-  cellIndex: number
-  value: number
-  isCorrect: boolean
-  createdAt: string
-}
-```
-
-Future realtime adapters can use Spring WebSocket/STOMP, Firebase Firestore `onSnapshot`, or Supabase Realtime channels.
-
-## Habit & Streak System
-
-SudokuMind includes a habit-building streak system that encourages users to return every day. Players can complete daily challenges, build streaks, earn XP, unlock achievements and track weekly progress.
-
-This turns Sudoku from a one-time puzzle into a daily brain-training habit.
-
-The dashboard shows:
-
-- Current Streak with a weekly completion line.
-- Daily Challenge status and Share Streak action.
-- XP, level progress and rewards.
-- Continue Game card from local autosave.
-- Daily Goal with XP reward.
-- Weekly Progress chart.
-- Streak milestones: 3, 7, 14, 30 and 100 days.
-- Pro-oriented Streak Freeze UI.
-
-Guest users store habit data in `localStorage`. The storage service in `lib/streak.ts` is intentionally isolated so it can later be backed by PostgreSQL, Firestore or Supabase without rewriting the dashboard UI.
-
-## Tech Stack
-
-Frontend:
-
-- Next.js 14 App Router
-- React 18
-- TypeScript
-- Tailwind CSS
-- Framer Motion
-- lucide-react
-- next-themes
-
-Backend:
-
-- Spring Boot 3
-- Java 17
-- Spring Security
-- JWT access/refresh tokens
-- Google OAuth2
-- PostgreSQL
-- Flyway
-- WebSocket/STOMP foundation
-- Render deployment
-
-Deployment:
-
-- Frontend: Vercel
-- Backend: Render
-- Database: PostgreSQL
-
-## Database Structure
-
-Core backend tables/entities:
-
-- `users`: id, username, email, avatarUrl, city, role, provider, createdAt.
-- `game_sessions`: userId, puzzle, solution, currentBoard, difficulty, elapsedSeconds, mistakes, hintsUsed, status.
-- `daily_challenges`: date, puzzle, solution, difficulty.
-- `daily_results`: userId, challengeId, timeSeconds, mistakes, accuracy, completedAt.
-- `friends`: friendship and friend request records.
-- `ai_hint_logs`: prompt/response logs for coach explanations.
-
-Planned battle persistence:
-
-- `battle_rooms`
-- `battle_room_players`
-- `battle_moves`
-- `battle_results`
-- `battle_achievements`
-
-## Environment Variables
-
-Frontend `.env`:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8080
-BACKEND_URL=http://localhost:8080
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-ANTHROPIC_API_KEY=
-```
-
-Backend variables:
-
-```env
-FRONTEND_URL=http://localhost:3000
-JWT_SECRET=replace-with-a-long-secret
-SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/sudokumind
-SPRING_DATASOURCE_USERNAME=sudokumind
-SPRING_DATASOURCE_PASSWORD=sudokumind
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-ANTHROPIC_API_KEY=
-```
-
-Production:
-
-- Vercel `NEXT_PUBLIC_API_URL` or `BACKEND_URL` should point to the Render backend.
-- Render `FRONTEND_URL` should point to the Vercel production domain.
-- Google OAuth redirect URI should be:
-
-```txt
-https://your-render-backend.onrender.com/login/oauth2/code/google
-```
-
-## How To Run Locally
-
-Install frontend dependencies:
-
-```bash
-npm install
-```
-
-Run frontend:
-
-```bash
-npm run dev
-```
-
-Run backend:
-
-```powershell
-cd backend
-.\mvnw.cmd spring-boot:run
-```
-
-Or with local helper:
-
-```powershell
-.\run-local.cmd
-```
-
-## Verification
-
-Frontend production build:
-
-```bash
-npm run build
-```
-
-Backend package:
-
-```powershell
-cd backend
-.\mvnw.cmd -q -DskipTests package
-```
-
-## API Surface
-
-Auth:
-
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/refresh`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
-- `GET /oauth2/authorization/google`
-
-Users:
-
-- `GET /api/users/me`
-- `PUT /api/users/me`
-- `DELETE /api/users/me`
-- `GET /api/users/search?username=...`
-
-Games:
-
-- `POST /api/games`
-- `PUT /api/games/{id}/save`
-- `POST /api/games/{id}/complete`
-- `GET /api/games/history`
-
-Daily:
-
-- `GET /api/daily/today`
-- `POST /api/daily/{id}/submit`
-- `GET /api/daily/{id}/leaderboard`
-
-AI:
-
-- `POST /api/ai/explain-cell`
-- Frontend fallback route: `POST /api/ai/hint`
-
-## Business Potential
-
-SudokuMind is positioned as a retention-focused brain training platform:
-
-- Daily challenges create habit loops.
-- Friend battles create social retention.
-- AI Coach creates learning value.
-- Pro plan supports unlimited hints, premium themes, advanced stats and expert puzzles.
-- City leaderboards make the product feel local and competitive.
-
-## Future Improvements
-
-- Replace mock Battle adapter with Spring WebSocket or Firestore/Supabase Realtime.
-- Persist battle rooms, moves and results in PostgreSQL.
-- Add Stripe Checkout and subscription webhooks.
-- Add premium board skins and Kids Mode.
-- Add Morning Brain Mode with short focus sessions.
-- Add real global leaderboard endpoint.
-- Add avatar upload storage.
-
-## Links
-
-- Deployment: add your Vercel production URL here.
-- Backend: add your Render backend URL here.
-- GitHub: https://github.com/meiirzhan04/Sudoku
+type UserRole = "USER" | "MODERATOR" | "ADMIN"
