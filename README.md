@@ -1,5 +1,13 @@
 # SudokuMind
 
+## Short Product Description
+
+SudokuMind is a modern web platform for playing, learning and competing in Sudoku.  
+We created a full Sudoku product with classic puzzle gameplay, daily challenges, streaks, leaderboards, user profiles, AI Teacher, Battle with Friends, AI Battle mode and an Admin Panel for user management and moderation.
+
+The platform is designed for casual Sudoku players, beginners who want to learn strategies, competitive users who want to race with friends, and students who want to improve logical thinking through daily practice.
+
+SudokuMind is valuable because it turns a simple Sudoku game into an interactive brain-training ecosystem. Users can not only solve puzzles, but also learn from AI, compete with other players, track their progress, build a daily habit, and stay engaged through achievements, rankings and social battles.
 SudokuMind is a modern web platform for playing, learning and competing in Sudoku.  
 It combines classic Sudoku gameplay with daily challenges, AI coaching, multiplayer battles, user profiles, leaderboards, admin management and moderation tools.
 
